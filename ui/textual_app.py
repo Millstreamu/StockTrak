@@ -198,9 +198,8 @@ class PortfolioServices:
 
     def get_price_status(self) -> PriceStatus:
         with self._session() as session:
-            latest = session.scalars(
-                select(models.PriceCache).order_by(models.PriceCache.asof.desc()).limit(1)
-            ).first()
+            stmt = select(models.PriceCache).order_by(models.PriceCache.asof.desc())
+            latest = session.scalars(stmt).first()
             if latest:
                 return PriceStatus(asof=latest.asof, stale=bool(latest.is_stale))
             return PriceStatus(asof=None, stale=self.cfg.offline_mode)
