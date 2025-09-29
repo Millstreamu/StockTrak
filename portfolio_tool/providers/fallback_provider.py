@@ -6,10 +6,14 @@ from typing import Dict
 
 from portfolio_tool.config import Config
 from portfolio_tool.core.pricing import PriceProvider, PriceQuote
+from typing import TYPE_CHECKING
+
 from portfolio_tool.providers.alphavantage_provider import AlphaVantageProvider
 from portfolio_tool.providers.marketindex_provider import MarketIndexProvider
-from portfolio_tool.providers.yahooquery_provider import YahooQueryProvider
-from portfolio_tool.providers.yfinance_provider import YFinanceProvider
+
+if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
+    from portfolio_tool.providers.yahooquery_provider import YahooQueryProvider
+    from portfolio_tool.providers.yfinance_provider import YFinanceProvider
 
 
 LOGGER = logging.getLogger(__name__)
@@ -39,8 +43,30 @@ class FallbackPriceProvider:
     def _build_provider(self, name: str) -> PriceProvider | None:
         match name:
             case "yfinance":
+                try:
+                    from portfolio_tool.providers.yfinance_provider import (
+                        YFinanceProvider,
+                    )
+                except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
+                    missing_dep = exc.name or "yfinance"
+                    LOGGER.info(
+                        "Skipping yfinance provider: optional dependency '%s' is not installed",
+                        missing_dep,
+                    )
+                    return None
                 return YFinanceProvider()
             case "yahooquery":
+                try:
+                    from portfolio_tool.providers.yahooquery_provider import (
+                        YahooQueryProvider,
+                    )
+                except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
+                    missing_dep = exc.name or "yahooquery"
+                    LOGGER.info(
+                        "Skipping yahooquery provider: optional dependency '%s' is not installed",
+                        missing_dep,
+                    )
+                    return None
                 return YahooQueryProvider()
             case "marketindex":
                 if not self.cfg.pricing.include_marketindex:
