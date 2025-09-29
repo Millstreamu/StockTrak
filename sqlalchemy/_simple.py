@@ -301,6 +301,10 @@ class Result(Iterable[Tuple[Any, ...]]):
     def __iter__(self) -> Iterator[Tuple[Any, ...]]:
         return iter(self._rows)
 
+    def scalars(self) -> ScalarResult:
+        values = [row[0] if row else None for row in self._rows]
+        return ScalarResult(values)
+
 
 class AggregateExpression:
     def __init__(self, func_name: str, column: ColumnExpression) -> None:
@@ -327,6 +331,7 @@ class Select:
         self._where: List[Condition] = []
         self._order_by: List[Ordering] = []
         self._group_by: List[ColumnExpression] = []
+        self._limit: int | None = None
 
     def where(self, *conditions: Condition) -> "Select":
         self._where.extend(conditions)
@@ -342,6 +347,10 @@ class Select:
 
     def group_by(self, *columns: ColumnExpression) -> "Select":
         self._group_by.extend(columns)
+        return self
+
+    def limit(self, count: int | None) -> "Select":
+        self._limit = count
         return self
 
     def _resolve_model(self) -> type:
@@ -454,19 +463,21 @@ class Session:
             for obj in data:
                 key = tuple(column.evaluate(obj) for column in stmt._group_by)
                 groups[key].append(obj)
-            rows: List[Tuple[Any, ...]] = []
+            rows = []
             for key, items in groups.items():
                 row = []
                 for entity in stmt._entities:
                     row.append(self._evaluate_group_entity(entity, items))
                 rows.append(tuple(row))
-            return rows
-        rows = []
-        for obj in data:
-            row = []
-            for entity in stmt._entities:
-                row.append(self._evaluate_entity(entity, obj))
-            rows.append(tuple(row))
+        else:
+            rows = []
+            for obj in data:
+                row = []
+                for entity in stmt._entities:
+                    row.append(self._evaluate_entity(entity, obj))
+                rows.append(tuple(row))
+        if stmt._limit is not None:
+            return rows[: stmt._limit]
         return rows
 
     def _evaluate_entity(self, entity: Any, obj: Any) -> Any:

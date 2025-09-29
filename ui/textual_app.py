@@ -199,10 +199,13 @@ class PortfolioServices:
     def get_price_status(self) -> PriceStatus:
         with self._session() as session:
             stmt = select(models.PriceCache).order_by(models.PriceCache.asof.desc())
-            latest = session.scalars(stmt).first()
-            if latest:
-                return PriceStatus(asof=latest.asof, stale=bool(latest.is_stale))
-            return PriceStatus(asof=None, stale=self.cfg.offline_mode)
+            row = session.execute(stmt.limit(1)).scalars().first()
+            if row:
+                return PriceStatus(
+                    asof=row.asof,
+                    stale=bool(getattr(row, "is_stale", False)),
+                )
+            return PriceStatus(asof=None, stale=True)
 
     def refresh_prices(self, symbols: Iterable[str]) -> dict[str, PriceQuote]:
         with self._session() as session:
