@@ -67,6 +67,15 @@ class ForeignKey:
 Mapped = TypeVar("Mapped")
 
 
+class Ordering:
+    def __init__(self, column: "ColumnExpression", *, descending: bool = False) -> None:
+        self.column = column
+        self.descending = descending
+
+    def evaluate(self, obj: Any) -> Any:
+        return self.column.evaluate(obj)
+
+
 class ColumnExpression:
     def __init__(self, model: type, name: str) -> None:
         self.model = model
@@ -74,6 +83,12 @@ class ColumnExpression:
 
     def evaluate(self, obj: Any) -> Any:
         return getattr(obj, self.name)
+
+    def desc(self) -> Ordering:
+        return Ordering(self, descending=True)
+
+    def asc(self) -> Ordering:
+        return Ordering(self, descending=False)
 
     def __eq__(self, other: Any) -> "Condition":  # type: ignore[override]
         return Condition(lambda obj: self.evaluate(obj) == other)
@@ -310,15 +325,19 @@ class Select:
             raise ValueError("Select requires at least one entity")
         self._entities: List[Any] = list(entities)
         self._where: List[Condition] = []
-        self._order_by: List[ColumnExpression] = []
+        self._order_by: List[Ordering] = []
         self._group_by: List[ColumnExpression] = []
 
     def where(self, *conditions: Condition) -> "Select":
         self._where.extend(conditions)
         return self
 
-    def order_by(self, *orderings: ColumnExpression) -> "Select":
-        self._order_by.extend(orderings)
+    def order_by(self, *orderings: ColumnExpression | Ordering) -> "Select":
+        for ordering in orderings:
+            if isinstance(ordering, Ordering):
+                self._order_by.append(ordering)
+            else:
+                self._order_by.append(ordering.asc())
         return self
 
     def group_by(self, *columns: ColumnExpression) -> "Select":
@@ -426,7 +445,10 @@ class Session:
         data = self._apply_where(data, stmt)
         if stmt._order_by:
             for ordering in reversed(stmt._order_by):
-                data.sort(key=lambda obj, col=ordering: col.evaluate(obj))
+                data.sort(
+                    key=lambda obj, ord=ordering: ord.evaluate(obj),
+                    reverse=ordering.descending,
+                )
         if stmt._group_by:
             groups: Dict[Tuple[Any, ...], List[Any]] = defaultdict(list)
             for obj in data:
