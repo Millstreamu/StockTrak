@@ -22,7 +22,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-cov", "freezegun", "python-dateutil"]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "freezegun",
+    "python-dateutil",
+    "pyinstaller>=6",
+]
 
 [project.scripts]
 portfolio = "portfolio_tool.__main__:app"
