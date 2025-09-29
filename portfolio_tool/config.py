@@ -22,6 +22,22 @@ class RuleThresholds:
 
 
 @dataclass
+class PricingConfig:
+    provider_primary: str = "yfinance"
+    fallbacks: list[str] = field(
+        default_factory=lambda: ["yahooquery", "marketindex", "alphavantage"]
+    )
+    price_ttl_minutes: int = 15
+    normalize_asx_suffix: bool = True
+    include_marketindex: bool = False
+
+
+@dataclass
+class AlphaVantageConfig:
+    api_key: str = ""
+
+
+@dataclass
 class Config:
     base_currency: str = "AUD"
     timezone: str = "Australia/Brisbane"
@@ -33,6 +49,8 @@ class Config:
     db_path: Path = DEFAULT_DB_PATH
     target_weights: Dict[str, float] = field(default_factory=dict)
     rule_thresholds: RuleThresholds = field(default_factory=RuleThresholds)
+    pricing: PricingConfig = field(default_factory=PricingConfig)
+    alpha_vantage: AlphaVantageConfig = field(default_factory=AlphaVantageConfig)
 
     @property
     def config_dir(self) -> Path:
@@ -52,7 +70,13 @@ def load_config(path: Optional[Path] = None) -> Config:
 
     cfg = Config()
 
-    for key in ("base_currency", "timezone", "lot_matching", "brokerage_allocation", "price_provider"):
+    for key in (
+        "base_currency",
+        "timezone",
+        "lot_matching",
+        "brokerage_allocation",
+        "price_provider",
+    ):
         if key in data:
             setattr(cfg, key, data[key])
 
@@ -73,10 +97,40 @@ def load_config(path: Optional[Path] = None) -> Config:
     cfg.rule_thresholds = RuleThresholds(
         cgt_window_days=int(rt.get("cgt_window_days", cfg.rule_thresholds.cgt_window_days)),
         overweight_band=float(rt.get("overweight_band", cfg.rule_thresholds.overweight_band)),
-        concentration_limit=float(rt.get("concentration_limit", cfg.rule_thresholds.concentration_limit)),
+        concentration_limit=float(
+            rt.get("concentration_limit", cfg.rule_thresholds.concentration_limit)
+        ),
         drawdown_pct=float(rt.get("drawdown_pct", cfg.rule_thresholds.drawdown_pct)),
         stale_note_days=int(rt.get("stale_note_days", cfg.rule_thresholds.stale_note_days)),
     )
+
+    pricing = data.get("pricing", {})
+    if pricing:
+        cfg.pricing = PricingConfig(
+            provider_primary=str(
+                pricing.get("provider_primary", cfg.pricing.provider_primary)
+            ),
+            fallbacks=list(pricing.get("fallbacks", cfg.pricing.fallbacks)),
+            price_ttl_minutes=int(
+                pricing.get("price_ttl_minutes", cfg.pricing.price_ttl_minutes)
+            ),
+            normalize_asx_suffix=bool(
+                pricing.get("normalize_asx_suffix", cfg.pricing.normalize_asx_suffix)
+            ),
+            include_marketindex=bool(
+                pricing.get("include_marketindex", cfg.pricing.include_marketindex)
+            ),
+        )
+        cfg.price_provider = cfg.pricing.provider_primary
+        cfg.price_ttl_minutes = cfg.pricing.price_ttl_minutes
+
+    alpha = data.get("alpha_vantage", {})
+    if alpha:
+        cfg.alpha_vantage = AlphaVantageConfig(api_key=str(alpha.get("api_key", "")))
+
+    if not pricing:
+        cfg.pricing.provider_primary = cfg.price_provider
+        cfg.pricing.price_ttl_minutes = cfg.price_ttl_minutes
 
     return cfg
 
@@ -85,4 +139,13 @@ def ensure_app_dirs(cfg: Config) -> None:
     cfg.db_path.parent.mkdir(parents=True, exist_ok=True)
 
 
-__all__ = ["Config", "RuleThresholds", "load_config", "ensure_app_dirs", "DEFAULT_DB_PATH", "DEFAULT_CONFIG_PATH"]
+__all__ = [
+    "Config",
+    "RuleThresholds",
+    "PricingConfig",
+    "AlphaVantageConfig",
+    "load_config",
+    "ensure_app_dirs",
+    "DEFAULT_DB_PATH",
+    "DEFAULT_CONFIG_PATH",
+]

@@ -28,8 +28,7 @@ from portfolio_tool.core.rules import generate_all_actionables
 from portfolio_tool.core.trades import TradeInput, record_trade
 from portfolio_tool.data import models, repo
 from portfolio_tool.data.repo import Database
-from portfolio_tool.providers.yfinance_provider import YFinanceProvider
-from portfolio_tool.providers.yahooquery_provider import YahooQueryProvider
+from portfolio_tool.providers.fallback_provider import FallbackPriceProvider
 
 from .views.actionables import ActionableAction, ActionablesView
 from .views.cgt_calendar import CGTCalendarView
@@ -474,9 +473,7 @@ class PortfolioApp(App):
 
 
 def _provider_for(cfg: Config):
-    if cfg.price_provider == "yahooquery":
-        return YahooQueryProvider()
-    return YFinanceProvider()
+    return FallbackPriceProvider(cfg)
 
 
 def build_services(cfg: Config, *, demo: bool = False) -> PortfolioServices:

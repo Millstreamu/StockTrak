@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import datetime as dt
 from decimal import Decimal
+import logging
 
 import yfinance as yf
 
 from portfolio_tool.core.pricing import PriceQuote
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class YFinanceProvider:
@@ -16,7 +20,24 @@ class YFinanceProvider:
         now = dt.datetime.now(dt.timezone.utc)
         if not symbols:
             return results
-        data = yf.download(symbols, period="1d", interval="1d", progress=False, auto_adjust=False)
+        try:
+            data = yf.download(
+                symbols,
+                period="1d",
+                interval="1d",
+                progress=False,
+                auto_adjust=False,
+            )
+        except ValueError as exc:
+            if "No data" in str(exc) or "decrypt" in str(exc).lower():
+                LOGGER.warning("yfinance download returned no data: %s", exc)
+                data = None
+            else:
+                LOGGER.warning("yfinance download error: %s", exc)
+                return results
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("yfinance download failed: %s", exc)
+            return results
         if hasattr(data, "empty") and data.empty:
             return results
         if hasattr(data, "columns") and ("Close" in data.columns or isinstance(data.columns, tuple)):
@@ -45,11 +66,19 @@ class YFinanceProvider:
                 return results
         # fallback per symbol
         for symbol in symbols:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="1d")
-            if hist.empty:
+            try:
+                ticker = yf.Ticker(symbol)
+                hist = ticker.history(period="1d")
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.warning("yfinance history failed for %s: %s", symbol, exc)
                 continue
-            price = Decimal(str(hist["Close"].iloc[-1]))
+            if getattr(hist, "empty", True):
+                continue
+            try:
+                price = Decimal(str(hist["Close"].iloc[-1]))
+            except (IndexError, KeyError, ValueError, ArithmeticError) as exc:
+                LOGGER.debug("yfinance close extraction failed for %s: %s", symbol, exc)
+                continue
             results[symbol] = PriceQuote(
                 symbol=symbol,
                 price=price,
