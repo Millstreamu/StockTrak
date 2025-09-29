@@ -45,17 +45,18 @@ except ModuleNotFoundError as exc:  # pragma: no cover - textual optional for te
 else:
     TEXTUAL_AVAILABLE = True
 
-from .views.actionables import ActionableAction, ActionablesView
-from .views.cgt_calendar import CGTCalendarView
-from .views.dashboard import DashboardView
-from .views.lots import LotSelected, LotsView
-from .views.positions import PositionSelected, PositionsView
-from .widgets.add_trade_modal import AddTradeModal
-from .widgets.header import HeaderWidget
-from .widgets.lot_detail import LotDetailWidget
-from .widgets.sidebar import Sidebar
-from .widgets.symbol_detail import SymbolDetailWidget
-from .widgets.toasts import ToastManager
+if TYPE_CHECKING:  # pragma: no cover - import for type checking only
+    from .views.actionables import ActionableAction, ActionablesView
+    from .views.cgt_calendar import CGTCalendarView
+    from .views.dashboard import DashboardView
+    from .views.lots import LotSelected, LotsView
+    from .views.positions import PositionSelected, PositionsView
+    from .widgets.add_trade_modal import AddTradeModal
+    from .widgets.header import HeaderWidget
+    from .widgets.lot_detail import LotDetailWidget
+    from .widgets.sidebar import Sidebar
+    from .widgets.symbol_detail import SymbolDetailWidget
+    from .widgets.toasts import ToastManager
 
 
 @dataclass
@@ -224,6 +225,18 @@ class PortfolioServices:
 
 
 if TEXTUAL_AVAILABLE:
+
+    from .views.actionables import ActionableAction, ActionablesView
+    from .views.cgt_calendar import CGTCalendarView
+    from .views.dashboard import DashboardView
+    from .views.lots import LotSelected, LotsView
+    from .views.positions import PositionSelected, PositionsView
+    from .widgets.add_trade_modal import AddTradeModal
+    from .widgets.header import HeaderWidget
+    from .widgets.lot_detail import LotDetailWidget
+    from .widgets.sidebar import Sidebar
+    from .widgets.symbol_detail import SymbolDetailWidget
+    from .widgets.toasts import ToastManager
 
     class TextPrompt(ModalScreen[str | None]):
         def __init__(self, title: str, prompt: str, default: str = "") -> None:
