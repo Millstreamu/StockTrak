@@ -47,6 +47,7 @@ The test suite covers lot matching strategies, CGT discount windows, brokerage a
 
 See [PRICING.md](PRICING.md) for provider and caching specifics.
 
+
 ## Command reference
 
 All commands accept `--config PATH` to point at an alternate configuration directory. Unless stated otherwise, datetime inputs
@@ -88,3 +89,4 @@ default to the configured timezone (Australia/Brisbane by default) and quantitie
 | --- | --- | --- |
 | `portfolio config show` | Print the active configuration merged from defaults and overrides. | `--json` to view raw JSON (if implemented). |
 | `portfolio config set KEY VALUE` | Update a configuration value in `config.toml`. Supports dot notation for nested keys. | `KEY` (e.g. `target_weights.CSL`) and `VALUE` (validated according to type). |
+
