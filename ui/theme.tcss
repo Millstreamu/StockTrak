@@ -1,0 +1,33 @@
+Screen {
+    background: #0f111a;
+    color: #e0e6f0;
+}
+
+#header {
+    padding: 1;
+    background: #1b1e2b;
+}
+
+#sidebar {
+    width: 24;
+    background: #161821;
+    padding: 1;
+}
+
+#main-content {
+    padding: 1;
+}
+
+#context-panel {
+    width: 60;
+    padding: 1;
+    background: #161821;
+}
+
+.view {
+    height: 100%;
+}
+
+#toasts {
+    height: 3;
+}

@@ -17,6 +17,7 @@ dependencies = [
     "yfinance>=0.2",
     "yahooquery>=2.3",
     "rich>=13.7",
+    "textual>=0.60",
     "pytz>=2023.3",
 ]
 

@@ -28,6 +28,7 @@ from portfolio_tool.data import models, repo
 from portfolio_tool.data.repo import Database
 from portfolio_tool.providers.yfinance_provider import YFinanceProvider
 from portfolio_tool.providers.yahooquery_provider import YahooQueryProvider
+from ui.textual_app import PortfolioApp, PortfolioServices, build_services
 from portfolio_tool.reports import md_renderer, tables
 from sqlalchemy import select
 
@@ -362,6 +363,21 @@ def actionables(
                 item.status,
             )
         console.print(table)
+
+
+@app.command()
+def ui(
+    ctx: typer.Context,
+    demo: bool = typer.Option(False, "--demo", help="Launch demo environment"),
+):
+    cfg: Config = ctx.obj["cfg"]
+    if demo:
+        services = build_services(cfg, demo=True)
+    else:
+        db: Database = ctx.obj["db"]
+        pricing: PriceService = ctx.obj["pricing"]
+        services = PortfolioServices(cfg, db, pricing)
+    PortfolioApp(services, demo=demo).run()
 
 
 def _load_config_raw(path: Path) -> dict:
