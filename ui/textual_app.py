@@ -7,6 +7,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
+from sqlalchemy import select
+
 from rich.table import Table
 from textual import events
 from textual.app import App, ComposeResult
@@ -108,12 +110,12 @@ class PortfolioServices:
             if symbol:
                 return build_lots(session, symbol)
             stmt = (
-                session.query(models.Lot)
+                select(models.Lot)
                 .where(models.Lot.qty_remaining > 0)
                 .order_by(models.Lot.acquired_at)
             )
             lots: list[LotRow] = []
-            for lot in stmt.all():
+            for lot in session.scalars(stmt):
                 lots.append(
                     LotRow(
                         lot_id=lot.id,
@@ -136,7 +138,7 @@ class PortfolioServices:
             if rows:
                 return rows
             positions = build_positions(session, self.cfg, self.pricing)
-            lots = list(session.query(models.Lot).all())
+            lots = list(session.scalars(select(models.Lot)))
             generated = generate_all_actionables(session, self.cfg, positions, lots)
             existing = repo.list_actionables(session)
             existing_keys = {(a.type, a.message) for a in existing}
@@ -169,13 +171,13 @@ class PortfolioServices:
     def get_symbol_detail(self, symbol: str) -> dict:
         with self._session() as session:
             lots = build_lots(session, symbol)
-            trades = (
-                session.query(models.Trade)
-                .filter(models.Trade.symbol == symbol.upper())
+            trades_stmt = (
+                select(models.Trade)
+                .where(models.Trade.symbol == symbol.upper())
                 .order_by(models.Trade.dt.desc())
                 .limit(10)
-                .all()
             )
+            trades = list(session.scalars(trades_stmt))
             price = repo.get_price(session, symbol.upper())
             return {
                 "symbol": symbol.upper(),
@@ -196,11 +198,9 @@ class PortfolioServices:
 
     def get_price_status(self) -> PriceStatus:
         with self._session() as session:
-            latest = (
-                session.query(models.PriceCache)
-                .order_by(models.PriceCache.asof.desc())
-                .first()
-            )
+            latest = session.scalars(
+                select(models.PriceCache).order_by(models.PriceCache.asof.desc()).limit(1)
+            ).first()
             if latest:
                 return PriceStatus(asof=latest.asof, stale=bool(latest.is_stale))
             return PriceStatus(asof=None, stale=self.cfg.offline_mode)
