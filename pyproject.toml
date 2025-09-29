@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portfolio-tool"
+version = "0.1.0"
+description = "Command-line portfolio tracker for ASX/US equities"
+authors = [{name = "StockTrak", email = "dev@example.com"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "typer[all]>=0.9",
+    "sqlalchemy>=2.0",
+    "alembic>=1.12",
+    "pydantic>=2.5",
+    "yfinance>=0.2",
+    "yahooquery>=2.3",
+    "rich>=13.7",
+    "pytz>=2023.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "freezegun", "python-dateutil"]
+
+[project.scripts]
+portfolio = "portfolio_tool.__main__:app"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.ruff]
+line-length = 88
+
