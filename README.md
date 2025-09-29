@@ -39,6 +39,22 @@ pytest
 
 The test suite covers lot matching strategies, CGT discount windows, brokerage allocation, cached pricing behaviour, actionable rules, and golden-file markdown exports.
 
+## Testing & Troubleshooting
+
+Run tests with:
+
+```bash
+pytest -q
+```
+
+Key checks:
+
+- Price cache query: We use `session.execute(select(...).limit(1)).scalars().first()`, which works across SQLAlchemy 1.4 and 2.0.
+- If you see `AttributeError: 'Select' object has no attribute 'limit'`, check that:
+  - You are importing `select` from `sqlalchemy`, not elsewhere.
+  - Your SQLAlchemy version is >= 1.4.
+- The test suite (`tests/test_price_status.py`) will fail early with a clear message if this problem exists.
+
 ## Configuration
 
 `portfolio config show` displays the active configuration. Update individual values with `portfolio config set KEY VALUE` (e.g. `portfolio config set price_ttl_minutes 30`). Nested keys are specified with dot notation, such as `portfolio config set target_weights.CSL 0.15`.
