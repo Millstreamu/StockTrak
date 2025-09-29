@@ -4,7 +4,26 @@ import datetime as dt
 from decimal import Decimal, InvalidOperation
 import logging
 
-import yfinance as yf
+try:  # pragma: no cover - import guard is hard to exercise in tests
+    import yfinance as yf
+except ModuleNotFoundError:  # pragma: no cover - exercised when optional dependency missing
+    class _MissingYFinance:
+        """Minimal stub used when the optional ``yfinance`` dependency is absent."""
+
+        _error = ModuleNotFoundError(
+            "The optional dependency 'yfinance' is required for YFinanceProvider."
+            " Install it via 'pip install yfinance' to enable live pricing."
+        )
+
+        def download(self, *args, **kwargs):  # noqa: D401 - same behaviour as yfinance
+            """Raise an informative error about the missing dependency."""
+
+            raise self._error
+
+        def Ticker(self, *args, **kwargs):  # noqa: N802 - matches yfinance API
+            raise self._error
+
+    yf = _MissingYFinance()
 
 from portfolio_tool.core.pricing import PriceQuote
 
