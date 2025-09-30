@@ -108,8 +108,13 @@ class AddTradeModal(ModalScreen[None]):
 
         if success:
             self.error.update("")
-            if self.app:
-                self.app.post_message(DataChanged())
-                if hasattr(self.app, "toast"):
-                    self.app.toast("Trade saved; refreshing…")
+            app = self.app
+            if app:
+                refresh_all = getattr(app, "refresh_all", None)
+                if callable(refresh_all):
+                    refresh_all()
+                else:
+                    app.post_message(DataChanged())
+                if hasattr(app, "toast"):
+                    app.toast("Trade saved; refreshing…")
             self.dismiss()
