@@ -23,11 +23,12 @@ All application data (configuration, SQLite database, and markdown exports) live
 
 ## Quick Troubleshooting
 
-### If the UI is empty or shows Offline
+### If the UI is empty or shows Offline/Prices stale
 1) Run `portfolio status` — check DB path and row counts.
 2) If Trades>0 and Lots=0, re-save a BUY (lot should be created) or file a bug.
 3) Run `portfolio price-refresh CSL.AX` to seed a fresh price.
-4) Ensure `offline_mode=false` in `~/.portfolio_tool/config.toml`.
+4) Ensure `offline_mode=false` in `~/.portfolio_tool/config.toml` if the header shows `[O] Offline`.
+5) If the header shows `[P] Prices stale` or `[P] No cached prices`, try refreshing prices or checking your network connection.
 
 ### TUI Troubleshooting
 
