@@ -49,7 +49,9 @@ class ActionablesView(DataTable):
     def on_key(self, event: events.Key) -> None:  # pragma: no cover - Textual callback
         if not self._rows:
             return
-        row_key = self.get_row_key(self.cursor_row)
+        if not self.is_valid_row_index(self.cursor_row):
+            return
+        row_key = self.ordered_rows[self.cursor_row].key
         if not row_key:
             return
         actionable_id = int(row_key)
