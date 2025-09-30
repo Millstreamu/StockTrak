@@ -7,9 +7,15 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Iterable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import create_engine, select
 
-from portfolio_tool.config import Config, ensure_app_dirs, load_config
+from portfolio_tool.config import Config, load_config
+from portfolio_tool.core.diagnostics import (
+    PortfolioDiagnostics,
+    PriceReason,
+    collect_diagnostics,
+    determine_price_status,
+)
 from portfolio_tool.core.pricing import PriceQuote, PriceService
 from portfolio_tool.core.reports import (
     LotRow,
@@ -21,6 +27,7 @@ from portfolio_tool.core.reports import (
 from portfolio_tool.core.rules import generate_all_actionables
 from portfolio_tool.core.trades import TradeInput, record_trade
 from portfolio_tool.data import models, repo
+from portfolio_tool.data.init_db import ensure_db
 from portfolio_tool.data.repo import Database
 from portfolio_tool.providers.fallback_provider import FallbackPriceProvider
 
@@ -30,7 +37,7 @@ try:  # pragma: no cover - exercised indirectly via textual UI usage
     from textual.app import App, ComposeResult
     from textual.containers import Container, Horizontal
     from textual.widget import Widget
-    from textual.widgets import Button, Footer, Input, Label
+    from textual.widgets import Button, Footer, Input, Label, Static
     from textual.screen import ModalScreen
 except ModuleNotFoundError as exc:  # pragma: no cover - textual optional for tests
     TEXTUAL_AVAILABLE = False
@@ -63,6 +70,7 @@ if TYPE_CHECKING:  # pragma: no cover - import for type checking only
 class PriceStatus:
     asof: Optional[dt.datetime]
     stale: bool
+    reason: PriceReason
 
 
 @dataclass
@@ -180,16 +188,15 @@ class PortfolioServices:
                 "trade": lot.trade,
             }
 
+    def get_diagnostics(self) -> PortfolioDiagnostics:
+        with self._session() as session:
+            return collect_diagnostics(self.cfg, session)
+
     def get_price_status(self) -> PriceStatus:
         with self._session() as session:
-            stmt = select(models.PriceCache).order_by(models.PriceCache.asof.desc())
-            row = session.execute(stmt.limit(1)).scalars().first()
-            if row:
-                return PriceStatus(
-                    asof=row.asof,
-                    stale=bool(getattr(row, "is_stale", False)),
-                )
-            return PriceStatus(asof=None, stale=True)
+            diagnostics = collect_diagnostics(self.cfg, session)
+        asof, reason = determine_price_status(diagnostics)
+        return PriceStatus(asof=asof, stale=reason != "ok", reason=reason)
 
     def refresh_prices(self, symbols: Iterable[str]) -> dict[str, PriceQuote]:
         with self._session() as session:
@@ -270,6 +277,55 @@ if TEXTUAL_AVAILABLE:
                 "Snooze for how many days?",
                 str(default_days),
             )
+
+
+    class DiagnosticsModal(ModalScreen[None]):
+        def __init__(
+            self,
+            diagnostics: PortfolioDiagnostics,
+            bindings: list[tuple[str, str, str]],
+        ) -> None:
+            super().__init__()
+            self.diagnostics = diagnostics
+            self.bindings = bindings
+
+        def compose(self) -> ComposeResult:
+            diag_table = Table(title="Portfolio Diagnostics")
+            diag_table.add_column("Metric")
+            diag_table.add_column("Value", overflow="fold")
+            diag_table.add_row("DB Path", str(self.diagnostics.db_path))
+            diag_table.add_row("DB Exists", "Yes" if self.diagnostics.db_exists else "No")
+            diag_table.add_row("Trades", str(self.diagnostics.trade_count))
+            diag_table.add_row("Lots", str(self.diagnostics.lot_count))
+            diag_table.add_row("Prices", str(self.diagnostics.price_count))
+            diag_table.add_row("Actionables", str(self.diagnostics.actionable_count))
+            latest = self.diagnostics.latest_price
+            if latest:
+                asof = latest.asof.astimezone(dt.timezone.utc).isoformat() if latest.asof else "—"
+                diag_table.add_row("Latest Price", f"{latest.symbol} @ {asof}")
+                diag_table.add_row("Stale", "Yes" if latest.is_stale else "No")
+            else:
+                diag_table.add_row("Latest Price", "—")
+                diag_table.add_row("Stale", "—")
+            diag_table.add_row("Offline Mode", "Yes" if self.diagnostics.offline_mode else "No")
+            diag_table.add_row("Price Provider", self.diagnostics.price_provider)
+            diag_table.add_row(
+                "Price TTL", f"{self.diagnostics.price_ttl_minutes} minutes"
+            )
+
+            shortcuts_table = Table(title="Shortcuts")
+            shortcuts_table.add_column("Key")
+            shortcuts_table.add_column("Action")
+            for key, _action, description in self.bindings:
+                shortcuts_table.add_row(key.upper(), description)
+
+            yield Static(diag_table, id="diagnostics-table")
+            yield Static(shortcuts_table, id="shortcuts-table")
+            yield Button("Close", id="close")
+
+        def on_button_pressed(self, event: Button.Pressed) -> None:
+            if event.button.id == "close":
+                self.dismiss(None)
 
 
     class PortfolioApp(App):
@@ -468,12 +524,12 @@ if TEXTUAL_AVAILABLE:
                 self.toasts.error(f"Price refresh failed: {exc}")
 
         def action_show_help(self) -> None:
-            help_text = Table(title="Shortcuts")
-            help_text.add_column("Key")
-            help_text.add_column("Action")
-            for binding in self.BINDINGS:
-                help_text.add_row(binding[0].upper(), binding[2])
-            self.toasts.info(help_text)
+            try:
+                diagnostics = self.services.get_diagnostics()
+            except Exception as exc:  # noqa: BLE001
+                self.toasts.error(f"Diagnostics failed: {exc}")
+                return
+            self.push_screen(DiagnosticsModal(diagnostics, self.BINDINGS))
 
         def on_position_selected(self, message: PositionSelected) -> None:
             self.current_symbol = message.symbol
@@ -549,10 +605,12 @@ def _provider_for(cfg: Config):
 def build_services(cfg: Config, *, demo: bool = False) -> PortfolioServices:
     if demo:
         cfg = Config(**{**cfg.__dict__})
+        engine = create_engine("sqlite+pysqlite:///:memory:")
+        models.Base.metadata.create_all(engine)
         cfg.db_path = Path(":memory:")
-    ensure_app_dirs(cfg)
-    database = Database(cfg)
-    database.create_all()
+    else:
+        engine = ensure_db()
+    database = Database(engine)
     pricing = PriceService(cfg, _provider_for(cfg))
     services = PortfolioServices(cfg, database, pricing)
     if demo:

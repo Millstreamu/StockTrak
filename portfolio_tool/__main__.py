@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import sys
 import tomllib
 from decimal import Decimal
 from pathlib import Path
@@ -11,8 +12,9 @@ from rich.console import Console
 from rich.table import Table
 from zoneinfo import ZoneInfo
 
-from portfolio_tool.config import Config, ensure_app_dirs, load_config
+from portfolio_tool.config import Config, load_config
 from portfolio_tool.core.cgt import cgt_threshold
+from portfolio_tool.core.diagnostics import collect_diagnostics, determine_price_status
 from portfolio_tool.core.lots import apply_disposal, match_disposal
 from portfolio_tool.core.pricing import PriceService
 from portfolio_tool.core.reports import (
@@ -25,6 +27,7 @@ from portfolio_tool.core.reports import (
 from portfolio_tool.core.rules import generate_all_actionables
 from portfolio_tool.core.trades import TradeInput, record_trade
 from portfolio_tool.data import models, repo
+from portfolio_tool.data.init_db import ensure_db
 from portfolio_tool.data.repo import Database
 from portfolio_tool.providers.fallback_provider import FallbackPriceProvider
 from ui.textual_app import PortfolioApp, PortfolioServices, build_services
@@ -47,9 +50,8 @@ def main(
     config: Optional[Path] = typer.Option(None, "--config", help="Path to config.toml"),
 ):
     cfg = load_config(config)
-    ensure_app_dirs(cfg)
-    database = Database(cfg)
-    database.create_all()
+    engine = ensure_db()
+    database = Database(engine)
     ctx.obj = {"cfg": cfg, "db": database, "pricing": PriceService(cfg, get_provider(cfg))}
 
 
@@ -276,29 +278,72 @@ def audit(ctx: typer.Context):
 
 
 @app.command()
+def status(ctx: typer.Context):
+    cfg: Config = ctx.obj["cfg"]
+    db: Database = ctx.obj["db"]
+    with db.session_scope() as session:
+        diagnostics = collect_diagnostics(cfg, session)
+    asof, reason = determine_price_status(diagnostics)
+    table = Table(title="Portfolio Status")
+    table.add_column("Metric")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Python", sys.executable)
+    table.add_row("DB Path", str(diagnostics.db_path))
+    table.add_row("DB Exists", "Yes" if diagnostics.db_exists else "No")
+    table.add_row("Trades", str(diagnostics.trade_count))
+    table.add_row("Lots", str(diagnostics.lot_count))
+    table.add_row("Prices", str(diagnostics.price_count))
+    table.add_row("Actionables", str(diagnostics.actionable_count))
+    latest = diagnostics.latest_price
+    if latest:
+        latest_asof = latest.asof.isoformat() if latest.asof else "—"
+        table.add_row("Latest Price", f"{latest.symbol} @ {latest_asof}")
+        table.add_row("Latest Price Stale", "Yes" if latest.is_stale else "No")
+    else:
+        table.add_row("Latest Price", "—")
+        table.add_row("Latest Price Stale", "—")
+    table.add_row("Price Status", reason)
+    table.add_row("Price Status As Of", asof.isoformat() if asof else "—")
+    table.add_row("Offline Mode", "Yes" if diagnostics.offline_mode else "No")
+    table.add_row("Price Provider", diagnostics.price_provider)
+    table.add_row("Price TTL Minutes", str(diagnostics.price_ttl_minutes))
+    console.print(table)
+
+
+@app.command()
 def price_refresh(ctx: typer.Context, symbols: list[str]):
     if not symbols:
         raise typer.BadParameter("Provide at least one symbol")
     cfg: Config = ctx.obj["cfg"]
     db: Database = ctx.obj["db"]
     pricing: PriceService = ctx.obj["pricing"]
+    symbol_list = [s.upper() for s in symbols]
+    if cfg.offline_mode:
+        console.print("[yellow]offline_mode is true; cached prices will be used.[/yellow]")
     with db.session_scope() as session:
-        quotes = pricing.get_quotes(session, [s.upper() for s in symbols])
-        table = Table(title="Price Refresh")
-        table.add_column("Symbol")
-        table.add_column("Price")
-        table.add_column("Currency")
-        table.add_column("As of")
-        for symbol in symbols:
-            quote = quotes.get(symbol.upper())
-            if quote:
-                table.add_row(
-                    quote.symbol,
-                    f"{quote.price:.2f}",
-                    quote.currency,
-                    quote.asof.isoformat(),
-                )
-        console.print(table)
+        quotes = pricing.get_quotes(session, symbol_list)
+    table = Table(title="Price Refresh")
+    table.add_column("Symbol")
+    table.add_column("Price")
+    table.add_column("Currency")
+    table.add_column("As of")
+    table.add_column("Provider")
+    table.add_column("Status")
+    for symbol in symbol_list:
+        quote = quotes.get(symbol)
+        if quote:
+            table.add_row(
+                quote.symbol,
+                f"{quote.price:.2f}",
+                quote.currency,
+                quote.asof.isoformat(),
+                quote.provider,
+                "updated",
+            )
+        else:
+            status = "offline_mode" if cfg.offline_mode else "no data"
+            table.add_row(symbol, "—", "—", "—", "—", status)
+    console.print(table)
 
 
 @app.command()

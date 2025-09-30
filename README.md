@@ -21,6 +21,14 @@ portfolio positions
 
 All application data (configuration, SQLite database, and markdown exports) lives under `~/.portfolio_tool` by default. Override the location via the `PORTFOLIO_TOOL_HOME` environment variable or by passing `--config` to any command.
 
+## Quick Troubleshooting
+
+### If the UI is empty or shows Offline
+1) Run `portfolio status` — check DB path and row counts.
+2) If Trades>0 and Lots=0, re-save a BUY (lot should be created) or file a bug.
+3) Run `portfolio price-refresh CSL.AX` to seed a fresh price.
+4) Ensure `offline_mode=false` in `~/.portfolio_tool/config.toml`.
+
 ## Features
 
 - Manual trade entry (buy or sell) with timezone-aware timestamps, fees, and optional notes.

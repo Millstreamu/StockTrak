@@ -97,3 +97,15 @@ def test_specific_id_matching(cfg, db):
         )
         disposal = session.scalars(select(models.Disposal)).one()
         assert disposal.lot_id == target_lot.id
+
+
+def test_buy_creates_lot(cfg, db):
+    trade_dt = dt.datetime(2024, 1, 15, tzinfo=dt.timezone.utc)
+    with db.session_scope() as session:
+        trade = record_trade(session, cfg, _trade(trade_dt, "5", "100"))
+        lots = list(session.scalars(select(models.Lot)))
+        assert len(lots) == 1
+        lot = lots[0]
+        assert Decimal(lot.qty_remaining) == trade.qty
+        assert lot.threshold_date is not None
+        assert lot.trade_id == trade.id

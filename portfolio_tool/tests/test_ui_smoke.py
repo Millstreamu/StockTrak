@@ -3,11 +3,13 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
+from sqlalchemy import create_engine
 
 textual = pytest.importorskip("textual")
 
 from portfolio_tool.config import Config
 from portfolio_tool.core.pricing import PriceQuote, PriceService
+from portfolio_tool.data import models
 from portfolio_tool.data.repo import Database
 
 from ui.textual_app import PortfolioApp, PortfolioServices
@@ -22,11 +24,11 @@ class DummyProvider:
         }
 
 
-def test_portfolio_app_instantiation(tmp_path):
+def test_portfolio_app_instantiation():
     cfg = Config()
-    cfg.db_path = tmp_path / "test.db"
-    db = Database(cfg)
-    db.create_all()
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    db = Database(engine)
     pricing = PriceService(cfg, DummyProvider())
     services = PortfolioServices(cfg, db, pricing)
     app = PortfolioApp(services)
