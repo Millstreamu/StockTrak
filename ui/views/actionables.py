@@ -46,12 +46,33 @@ class ActionablesView(DataTable):
                 key=str(actionable.id),
             )
 
+    def _get_row_key(self, row_index: int) -> str | None:
+        """Return the key for a row if available.
+
+        Textual's :class:`DataTable` API has evolved across releases, and older
+        versions exposed a ``get_row_key`` method while newer ones provide the
+        ``get_row_at`` helper alongside the ``ordered_rows`` sequence.  To keep
+        the view compatible with both variants we try the modern API first and
+        fall back to the attribute when necessary.
+        """
+
+        if not self.is_valid_row_index(row_index):
+            return None
+
+        try:
+            row = self.get_row_at(row_index)
+        except AttributeError:
+            ordered_rows = getattr(self, "ordered_rows", None)
+            if ordered_rows is None:
+                return None
+            row = ordered_rows[row_index]
+
+        return getattr(row, "key", None)
+
     def on_key(self, event: events.Key) -> None:  # pragma: no cover - Textual callback
         if not self._rows:
             return
-        if not self.is_valid_row_index(self.cursor_row):
-            return
-        row_key = self.ordered_rows[self.cursor_row].key
+        row_key = self._get_row_key(self.cursor_row)
         if not row_key:
             return
         actionable_id = int(row_key)
