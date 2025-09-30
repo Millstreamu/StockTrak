@@ -19,7 +19,12 @@ class HeaderWidget(Widget):
         self.cfg = cfg
         from ..textual_app import PriceStatus  # Local import to avoid cycle
 
-        self._status = PriceStatus(asof=None, stale=cfg.offline_mode)
+        default_reason = "offline_mode" if cfg.offline_mode else "no_prices"
+        self._status = PriceStatus(
+            asof=None,
+            stale=cfg.offline_mode or default_reason != "ok",
+            reason=default_reason,
+        )
 
     def update_status(self, status: "PriceStatus") -> None:
         self._status = status
@@ -32,6 +37,6 @@ class HeaderWidget(Widget):
             parts.append(f"Prices: {timestamp}")
         else:
             parts.append("Prices: —")
-        if self._status.stale:
-            parts.append("[O] Offline")
+        if self._status.reason != "ok":
+            parts.append(f"[O] Offline [{self._status.reason}]")
         return Text(" | ".join(parts), style="bold white")

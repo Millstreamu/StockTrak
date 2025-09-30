@@ -7,7 +7,32 @@ from typing import Any, Dict, Optional
 
 import tomllib
 
-DEFAULT_CONFIG_DIR = Path(os.environ.get("PORTFOLIO_TOOL_HOME", Path.home() / ".portfolio_tool"))
+_DB_PATH_OVERRIDE: Optional[Path] = None
+
+
+def get_data_dir() -> Path:
+    override = os.environ.get("PORTFOLIO_TOOL_HOME")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".portfolio_tool"
+
+
+def _set_db_path_override(path: Optional[Path]) -> None:
+    global _DB_PATH_OVERRIDE
+    _DB_PATH_OVERRIDE = path.expanduser() if path else None
+
+
+def get_db_path() -> Path:
+    path = _DB_PATH_OVERRIDE or (get_data_dir() / "portfolio.db")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_db_url() -> str:
+    return f"sqlite:///{get_db_path()}"
+
+
+DEFAULT_CONFIG_DIR = get_data_dir()
 DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_DIR / "config.toml"
 DEFAULT_DB_PATH = DEFAULT_CONFIG_DIR / "portfolio.db"
 
@@ -46,7 +71,7 @@ class Config:
     price_provider: str = "yfinance"
     price_ttl_minutes: int = 15
     offline_mode: bool = False
-    db_path: Path = DEFAULT_DB_PATH
+    db_path: Path = field(default_factory=get_db_path)
     target_weights: Dict[str, float] = field(default_factory=dict)
     rule_thresholds: RuleThresholds = field(default_factory=RuleThresholds)
     pricing: PricingConfig = field(default_factory=PricingConfig)
@@ -86,9 +111,12 @@ def load_config(path: Optional[Path] = None) -> Config:
         cfg.offline_mode = bool(data["offline_mode"])
 
     if "db_path" in data:
-        cfg.db_path = Path(data["db_path"]).expanduser()
+        custom_path = Path(data["db_path"]).expanduser()
+        _set_db_path_override(custom_path)
+        cfg.db_path = custom_path
     else:
-        cfg.db_path = DEFAULT_DB_PATH
+        _set_db_path_override(None)
+        cfg.db_path = get_db_path()
 
     target_weights = data.get("target_weights", {})
     cfg.target_weights = {k.upper(): float(v) for k, v in target_weights.items()}
@@ -146,6 +174,9 @@ __all__ = [
     "AlphaVantageConfig",
     "load_config",
     "ensure_app_dirs",
+    "get_data_dir",
+    "get_db_path",
+    "get_db_url",
     "DEFAULT_DB_PATH",
     "DEFAULT_CONFIG_PATH",
 ]

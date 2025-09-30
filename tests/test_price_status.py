@@ -63,6 +63,7 @@ def test_get_price_status_no_rows(mem_session):
     assert isinstance(status, PriceStatus)
     assert status.asof is None
     assert status.stale is True
+    assert status.reason == "no_prices"
 
 
 def test_get_price_status_with_row(mem_session):
@@ -87,3 +88,4 @@ def test_get_price_status_with_row(mem_session):
 
     assert status.asof == now
     assert status.stale is False
+    assert status.reason == "ok"

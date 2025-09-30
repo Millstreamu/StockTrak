@@ -6,19 +6,22 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import create_engine, func, select
+from typing import TYPE_CHECKING, Any
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from portfolio_tool.config import Config, ensure_app_dirs
 from . import models
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from sqlalchemy.engine import Engine
+else:  # pragma: no cover - fallback for stubbed SQLAlchemy
+    Engine = Any
 
 
 class Database:
-    def __init__(self, cfg: Config):
-        ensure_app_dirs(cfg)
-        self.engine = create_engine(
-            f"sqlite:///{cfg.db_path}", connect_args={"check_same_thread": False}
-        )
+    def __init__(self, engine: Engine):
+        self.engine = engine
         self.Session = sessionmaker(self.engine, expire_on_commit=False)
 
     def create_all(self):

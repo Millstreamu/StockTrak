@@ -6,11 +6,11 @@ from decimal import Decimal
 from typing import Sequence
 
 from sqlalchemy.orm import Session
+from zoneinfo import ZoneInfo
 
 from portfolio_tool.config import Config
-from portfolio_tool.core.cgt import cgt_threshold
 from portfolio_tool.core.lots import apply_disposal, match_disposal
-from portfolio_tool.data import repo
+from portfolio_tool.data import models, repo
 
 
 @dataclass
@@ -53,17 +53,18 @@ def record_trade(
             fee_allocation = trade_input.fees
         elif cfg.brokerage_allocation == "SPLIT":
             fee_allocation = trade_input.fees / 2
-        cost_base = trade_input.qty * trade_input.price + fee_allocation
-        threshold = cgt_threshold(trade_input.dt, cfg.timezone)
-        repo.create_lot(
-            session,
-            symbol=symbol,
-            acquired_at=trade_input.dt,
-            qty=trade_input.qty,
-            cost_base=cost_base,
-            threshold_date=threshold,
+        tz = ZoneInfo(cfg.timezone)
+        threshold_date = trade.dt.astimezone(tz).date() + dt.timedelta(days=365)
+        lot = models.Lot(
+            symbol=trade.symbol,
+            acquired_at=trade.dt,
+            qty_remaining=trade.qty,
+            cost_base_total=trade.qty * trade.price + fee_allocation,
+            threshold_date=threshold_date,
             trade_id=trade.id,
         )
+        session.add(lot)
+        session.flush()
     else:
         fee_allocation = Decimal("0")
         if cfg.brokerage_allocation == "SELL":
