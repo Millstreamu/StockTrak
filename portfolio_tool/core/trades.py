@@ -24,6 +24,25 @@ class TradeInput:
     exchange: str | None = None
     note: str | None = None
 
+def create_lot_for_buy(
+    session: Session,
+    cfg: Config,
+    trade: models.Trade,
+    fee_allocation: Decimal,
+) -> models.Lot:
+    tz = ZoneInfo(cfg.timezone)
+    threshold_date = trade.dt.astimezone(tz).date() + dt.timedelta(days=365)
+    cost_base = trade.qty * trade.price + fee_allocation
+    return repo.create_lot(
+        session,
+        symbol=trade.symbol,
+        acquired_at=trade.dt,
+        qty=trade.qty,
+        cost_base=cost_base,
+        threshold_date=threshold_date,
+        trade_id=trade.id,
+    )
+
 
 def record_trade(
     session: Session,
@@ -53,18 +72,7 @@ def record_trade(
             fee_allocation = trade_input.fees
         elif cfg.brokerage_allocation == "SPLIT":
             fee_allocation = trade_input.fees / 2
-        tz = ZoneInfo(cfg.timezone)
-        threshold_date = trade.dt.astimezone(tz).date() + dt.timedelta(days=365)
-        lot = models.Lot(
-            symbol=trade.symbol,
-            acquired_at=trade.dt,
-            qty_remaining=trade.qty,
-            cost_base_total=trade.qty * trade.price + fee_allocation,
-            threshold_date=threshold_date,
-            trade_id=trade.id,
-        )
-        session.add(lot)
-        session.flush()
+        create_lot_for_buy(session, cfg, trade, fee_allocation)
     else:
         fee_allocation = Decimal("0")
         if cfg.brokerage_allocation == "SELL":
@@ -88,4 +96,4 @@ def record_trade(
     return trade
 
 
-__all__ = ["TradeInput", "record_trade"]
+__all__ = ["TradeInput", "create_lot_for_buy", "record_trade"]

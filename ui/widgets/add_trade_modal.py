@@ -9,6 +9,7 @@ from textual.widgets import Button, Input, Label, Select
 from zoneinfo import ZoneInfo
 
 from portfolio_tool.config import Config
+from ..events import DataChanged
 
 
 @dataclass
@@ -95,6 +96,20 @@ class AddTradeModal(ModalScreen[None]):
             "exchange": exchange_widget.value.strip() or None,
             "note": note_widget.value.strip() or None,
         }
+        success = False
         if self.on_submit:
-            self.on_submit(data)
-        self.dismiss()
+            try:
+                success = bool(self.on_submit(data))
+            except Exception as exc:  # pragma: no cover - defensive UI guard
+                self.error.update(str(exc))
+                return
+        else:
+            success = True
+
+        if success:
+            self.error.update("")
+            if self.app:
+                self.app.post_message(DataChanged())
+                if hasattr(self.app, "toast"):
+                    self.app.toast("Trade saved; refreshing…")
+            self.dismiss()

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import logging
+import os
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -31,9 +33,11 @@ from portfolio_tool.data.init_db import ensure_db
 from portfolio_tool.data.repo import Database
 from portfolio_tool.providers.fallback_provider import FallbackPriceProvider
 
+from .events import DataChanged
+
 try:  # pragma: no cover - exercised indirectly via textual UI usage
     from rich.table import Table
-    from textual import events
+    from textual import events, on
     from textual.app import App, ComposeResult
     from textual.containers import Container, Horizontal
     from textual.widget import Widget
@@ -82,6 +86,34 @@ class DashboardSummary:
     upcoming_cgt: list[LotRow]
     actionable_count: int
 
+
+LOG_PATH = Path.home() / ".portfolio_tool" / "logs" / "ui.log"
+log = logging.getLogger("ui")
+
+
+def configure_logging() -> None:
+    """Ensure UI logs are routed to the configured destinations."""
+
+    if log.handlers:
+        return
+
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+
+    file_handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    log.addHandler(file_handler)
+
+    if os.environ.get("TEXTUAL_LOG", "").lower() == "debug":
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(logging.DEBUG)
+        stream_handler.setFormatter(formatter)
+        log.addHandler(stream_handler)
+
+    log.setLevel(logging.DEBUG)
+    log.propagate = False
+
 class PortfolioServices:
     """Adapter layer for the TUI to interact with the domain services."""
 
@@ -120,9 +152,13 @@ class PortfolioServices:
                 )
             return lots
 
-    def get_cgt_calendar(self, days: int) -> list[LotRow]:
+    def get_all_lots(self) -> list[LotRow]:
+        return self.get_lots()
+
+    def get_cgt_calendar(self, days: int | None = None) -> list[LotRow]:
+        window = days or self.cfg.rule_thresholds.cgt_window_days
         with self._session() as session:
-            return build_cgt_calendar(session, self.cfg, days)
+            return build_cgt_calendar(session, self.cfg, window)
 
     def get_actionables(self) -> list[models.Actionable]:
         with self._session() as session:
@@ -343,6 +379,7 @@ if TEXTUAL_AVAILABLE:
         ]
 
         def __init__(self, services: PortfolioServices, *, demo: bool = False):
+            configure_logging()
             super().__init__()
             self.services = services
             self.demo = demo
@@ -350,6 +387,7 @@ if TEXTUAL_AVAILABLE:
             self.current_lot: Optional[int] = None
             self.header: HeaderWidget | None = None
             self.sidebar: Sidebar | None = None
+            self.main_container: Container | None = None
             self.dashboard_view = DashboardView()
             self.positions_view = PositionsView()
             self.lots_view = LotsView()
@@ -370,6 +408,7 @@ if TEXTUAL_AVAILABLE:
                 self.actionables_view,
                 id="main-content",
             )
+            self.main_container = content
             context_panel = Container(
                 self.symbol_detail,
                 self.lot_detail,
@@ -380,20 +419,61 @@ if TEXTUAL_AVAILABLE:
             yield self.toasts
             yield Footer()
 
+        def toast(self, message: str, level: str = "info") -> None:
+            if not self.toasts:
+                return
+            handler = getattr(self.toasts, level, None)
+            if callable(handler):
+                handler(message)
+            else:
+                self.toasts.info(message)
+
         def on_mount(self) -> None:
-            self.sidebar.focus()
+            if self.sidebar:
+                self.sidebar.highlight("dashboard")
+                try:
+                    self.sidebar.query_one("#nav-dashboard", Button).focus()
+                except Exception:  # pragma: no cover - focus fallback
+                    self.sidebar.focus()
             self.show_dashboard()
             self.refresh_all()
 
         def on_key(self, event: events.Key) -> None:
-            if event.key == "f":
+            key = event.key
+            if key == "1":
+                self.show_dashboard()
+                self.toast("Dashboard")
+                event.stop()
+                return
+            if key == "2":
+                self.show_positions()
+                self.toast("Positions")
+                event.stop()
+                return
+            if key == "3":
+                self.show_lots()
+                self.toast("Lots")
+                event.stop()
+                return
+            if key == "4":
+                self.show_cgt()
+                self.toast("CGT Calendar")
+                event.stop()
+                return
+            if key == "5":
+                self.show_actionables()
+                self.toast("Actionables")
+                event.stop()
+                return
+
+            if key == "f":
                 if self.focused is self.positions_view:
                     self.prompt_symbol_filter(self.positions_view.set_symbol_filter)
                     event.stop()
                 elif self.focused is self.lots_view:
                     self.prompt_symbol_filter(self.lots_view.set_symbol_filter)
                     event.stop()
-            elif event.key == "e" and self.focused is self.positions_view:
+            elif key == "e" and self.focused is self.positions_view:
                 symbol = self.current_symbol
                 if not symbol:
                     return
@@ -418,63 +498,167 @@ if TEXTUAL_AVAILABLE:
 
             self.push_screen(prompt, callback=_finish)
 
+        def _ensure_mounted(self, view: Widget) -> None:
+            if not view.parent and self.main_container:
+                self.main_container.mount(view)
+
         def _handle_weight_prompt(self, symbol: str, result: str | None) -> None:
             if result is None:
                 return
             try:
                 weight = float(result) / 100
             except ValueError:
-                self.toasts.error("Invalid weight")
+                self.toast("Invalid weight", level="error")
                 return
             self.services.cfg.target_weights[symbol] = weight
-            self.toasts.success(f"Updated target weight for {symbol}")
+            self.toast(f"Updated target weight for {symbol}", level="success")
 
         def refresh_all(self) -> None:
-            summary = self.services.dashboard_summary()
-            self.dashboard_view.update_summary(summary)
-            positions = self.services.get_positions()
-            self.positions_view.update_rows(positions)
-            lots = self.services.get_lots()
-            self.lots_view.update_rows(lots)
-            cgt = self.services.get_cgt_calendar(
-                self.services.cfg.rule_thresholds.cgt_window_days
-            )
-            self.cgt_view.update_rows(cgt)
-            actionables = self.services.get_actionables()
-            self.actionables_view.update_rows(actionables)
-            status = self.services.get_price_status()
-            if self.header:
-                self.header.update_status(status)
+            try:
+                summary = self.services.dashboard_summary()
+                self.dashboard_view.update_summary(summary)
+                log.debug("Dashboard summary refreshed")
+            except Exception:  # noqa: BLE001
+                log.exception("Dashboard refresh failed")
+                self.toast("Dashboard refresh failed — see logs", level="warning")
+
+            try:
+                positions = self.services.get_positions()
+                self.positions_view.update_rows(positions)
+                log.debug("Positions: %d rows", len(positions))
+            except Exception:  # noqa: BLE001
+                log.exception("Positions refresh failed")
+                self.toast("Positions refresh failed — see logs", level="warning")
+
+            try:
+                lots = self.services.get_all_lots()
+                self.lots_view.update_rows(lots)
+                log.debug("Lots: %d rows", len(lots))
+            except Exception:  # noqa: BLE001
+                log.exception("Lots refresh failed")
+                self.toast("Lots refresh failed — see logs", level="warning")
+
+            try:
+                window = self.services.cfg.rule_thresholds.cgt_window_days
+                cgt = self.services.get_cgt_calendar(window)
+                self.cgt_view.update_rows(cgt)
+                log.debug("CGT items: %d", len(cgt))
+            except Exception:  # noqa: BLE001
+                log.exception("CGT refresh failed")
+                self.toast("CGT refresh failed — see logs", level="warning")
+
+            try:
+                actionables = self.services.get_actionables()
+                self.actionables_view.update_rows(actionables)
+                log.debug("Actionables: %d", len(actionables))
+            except Exception:  # noqa: BLE001
+                log.exception("Actionables refresh failed")
+                self.toast("Actionables refresh failed — see logs", level="warning")
+
+            try:
+                status = self.services.get_price_status()
+                if self.header:
+                    self.header.update_status(status)
+            except Exception:  # noqa: BLE001
+                log.exception("Header status refresh failed")
+
+        @on(DataChanged)
+        def _on_data_changed(self, _: DataChanged) -> None:
+            self.refresh_all()
 
         def action_nav_dashboard(self) -> None:
             self.show_dashboard()
+            self.toast("Dashboard")
 
         def show_dashboard(self) -> None:
+            self._ensure_mounted(self.dashboard_view)
             self.set_view(self.dashboard_view)
+            if self.main_container:
+                self.main_container.visible = True
+            try:
+                summary = self.services.dashboard_summary()
+                self.dashboard_view.update_summary(summary)
+            except Exception:  # noqa: BLE001
+                log.exception("Dashboard refresh failed")
+                self.toast("Dashboard refresh failed — see logs", level="warning")
             if self.sidebar:
                 self.sidebar.highlight("dashboard")
 
         def action_nav_positions(self) -> None:
+            self.show_positions()
+            self.toast("Positions")
+
+        def action_nav_lots(self) -> None:
+            self.show_lots()
+            self.toast("Lots")
+
+        def action_nav_cgt(self) -> None:
+            self.show_cgt()
+            self.toast("CGT Calendar")
+
+        def action_nav_actionables(self) -> None:
+            self.show_actionables()
+            self.toast("Actionables")
+
+        def show_positions(self) -> None:
+            self._ensure_mounted(self.positions_view)
             self.set_view(self.positions_view)
+            if self.main_container:
+                self.main_container.visible = True
+            try:
+                rows = self.services.get_positions()
+                self.positions_view.update_rows(rows)
+            except Exception:  # noqa: BLE001
+                log.exception("Positions refresh failed")
+                self.toast("Positions refresh failed — see logs", level="warning")
             if self.sidebar:
                 self.sidebar.highlight("positions")
 
-        def action_nav_lots(self) -> None:
+        def show_lots(self) -> None:
+            self._ensure_mounted(self.lots_view)
             self.set_view(self.lots_view)
+            if self.main_container:
+                self.main_container.visible = True
+            try:
+                rows = self.services.get_all_lots()
+                self.lots_view.update_rows(rows)
+            except Exception:  # noqa: BLE001
+                log.exception("Lots refresh failed")
+                self.toast("Lots refresh failed — see logs", level="warning")
             if self.sidebar:
                 self.sidebar.highlight("lots")
 
-        def action_nav_cgt(self) -> None:
+        def show_cgt(self) -> None:
+            self._ensure_mounted(self.cgt_view)
             self.set_view(self.cgt_view)
+            if self.main_container:
+                self.main_container.visible = True
+            try:
+                window = self.services.cfg.rule_thresholds.cgt_window_days
+                rows = self.services.get_cgt_calendar(window)
+                self.cgt_view.update_rows(rows)
+            except Exception:  # noqa: BLE001
+                log.exception("CGT refresh failed")
+                self.toast("CGT refresh failed — see logs", level="warning")
             if self.sidebar:
                 self.sidebar.highlight("cgt")
 
-        def action_nav_actionables(self) -> None:
+        def show_actionables(self) -> None:
+            self._ensure_mounted(self.actionables_view)
             self.set_view(self.actionables_view)
+            if self.main_container:
+                self.main_container.visible = True
+            try:
+                rows = self.services.get_actionables()
+                self.actionables_view.update_rows(rows)
+            except Exception:  # noqa: BLE001
+                log.exception("Actionables refresh failed")
+                self.toast("Actionables refresh failed — see logs", level="warning")
             if self.sidebar:
                 self.sidebar.highlight("actionables")
 
         def set_view(self, view: Widget) -> None:
+            self._ensure_mounted(view)
             for widget in (
                 self.dashboard_view,
                 self.positions_view,
@@ -482,14 +666,40 @@ if TEXTUAL_AVAILABLE:
                 self.cgt_view,
                 self.actionables_view,
             ):
-                widget.display = widget is view
+                if widget.parent:
+                    widget.display = widget is view
+
+        @on(Button.Pressed, "#nav-dashboard")
+        def _go_dashboard(self, _: Button.Pressed) -> None:
+            self.show_dashboard()
+            self.toast("Dashboard")
+
+        @on(Button.Pressed, "#nav-positions")
+        def _go_positions(self, _: Button.Pressed) -> None:
+            self.show_positions()
+            self.toast("Positions")
+
+        @on(Button.Pressed, "#nav-lots")
+        def _go_lots(self, _: Button.Pressed) -> None:
+            self.show_lots()
+            self.toast("Lots")
+
+        @on(Button.Pressed, "#nav-cgt")
+        def _go_cgt(self, _: Button.Pressed) -> None:
+            self.show_cgt()
+            self.toast("CGT Calendar")
+
+        @on(Button.Pressed, "#nav-actionables")
+        def _go_actionables(self, _: Button.Pressed) -> None:
+            self.show_actionables()
+            self.toast("Actionables")
 
         def action_add_trade(self) -> None:
             modal = AddTradeModal(self.services.cfg)
             modal.on_submit = self._handle_trade_submit
             self.push_screen(modal)
 
-        def _handle_trade_submit(self, data: dict) -> None:
+        def _handle_trade_submit(self, data: dict) -> bool:
             try:
                 trade_input = TradeInput(
                     side=data["side"],
@@ -503,15 +713,14 @@ if TEXTUAL_AVAILABLE:
                 )
                 self.services.record_trade(trade_input)
             except Exception as exc:  # noqa: BLE001
-                self.toasts.error(str(exc))
-            else:
-                self.toasts.success("Trade recorded")
-                self.refresh_all()
+                self.toast(str(exc), level="error")
+                return False
+            return True
 
         def action_refresh_prices(self) -> None:
             symbols = [row.symbol for row in self.services.get_positions()]
             if not symbols:
-                self.toasts.warning("No positions to refresh")
+                self.toast("No positions to refresh", level="warning")
                 return
             try:
                 self.services.refresh_prices(symbols)
@@ -519,15 +728,15 @@ if TEXTUAL_AVAILABLE:
                 if self.header:
                     self.header.update_status(status)
                 self.refresh_all()
-                self.toasts.success("Prices refreshed")
+                self.toast("Prices refreshed", level="success")
             except Exception as exc:  # noqa: BLE001
-                self.toasts.error(f"Price refresh failed: {exc}")
+                self.toast(f"Price refresh failed: {exc}", level="error")
 
         def action_show_help(self) -> None:
             try:
                 diagnostics = self.services.get_diagnostics()
             except Exception as exc:  # noqa: BLE001
-                self.toasts.error(f"Diagnostics failed: {exc}")
+                self.toast(f"Diagnostics failed: {exc}", level="error")
                 return
             self.push_screen(DiagnosticsModal(diagnostics, self.BINDINGS))
 
@@ -554,8 +763,8 @@ if TEXTUAL_AVAILABLE:
         def on_actionable_action(self, message: ActionableAction) -> None:
             if message.action == "done":
                 self.services.mark_actionable_done(message.actionable_id)
-                self.toasts.success("Actionable completed")
-                self.refresh_all()
+                self.toast("Actionable completed", level="success")
+                self.post_message(DataChanged())
             elif message.action == "snooze":
                 prompt = SnoozePrompt()
                 self.push_screen(
@@ -571,11 +780,11 @@ if TEXTUAL_AVAILABLE:
             try:
                 days = int(result)
             except ValueError:
-                self.toasts.error("Invalid snooze period")
+                self.toast("Invalid snooze period", level="error")
                 return
             self.services.snooze_actionable(actionable_id, days)
-            self.toasts.success(f"Snoozed for {days} days")
-            self.refresh_all()
+            self.toast(f"Snoozed for {days} days", level="success")
+            self.post_message(DataChanged())
 
 
     def run(argv: Optional[list[str]] = None) -> None:

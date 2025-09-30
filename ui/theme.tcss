@@ -12,6 +12,35 @@ Screen {
     width: 24;
     background: #161821;
     padding: 1;
+    height: 100%;
+}
+
+#sidebar-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#sidebar-nav {
+    height: auto;
+    gap: 1;
+    margin-bottom: 1;
+}
+
+.sidebar-button {
+    width: 100%;
+    border: tall transparent;
+}
+
+.sidebar-button.active {
+    background: #1f6feb;
+    color: #ffffff;
+    border: tall #1f6feb;
+    text-style: bold;
+}
+
+#sidebar-shortcuts {
+    color: #9aa5ce;
+    white-space: pre-line;
 }
 
 #main-content {
