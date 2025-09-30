@@ -16,6 +16,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
@@ -223,6 +224,106 @@ def launch_application(python_executable: Path, cli_args: Sequence[str] | None) 
     run_command(command)
 
 
+def fetch_price(python_executable: Path, symbol: str) -> float | None:
+    script = textwrap.dedent(
+        """
+        import math
+        import sys
+
+        symbol = sys.argv[1]
+
+        try:
+            import yfinance as yf
+        except Exception:
+            sys.exit(0)
+
+        try:
+            ticker = yf.Ticker(symbol)
+        except Exception:
+            sys.exit(0)
+
+        price = None
+
+        try:
+            fast_info = getattr(ticker, "fast_info", None)
+        except Exception:
+            fast_info = None
+
+        if fast_info is not None:
+            candidate = getattr(fast_info, "last_price", None)
+            if candidate is None and hasattr(fast_info, "get"):
+                candidate = fast_info.get("last_price")
+            if candidate is not None:
+                try:
+                    price = float(candidate)
+                except Exception:
+                    price = None
+
+        if price is None:
+            try:
+                history = ticker.history(period="1d")
+            except Exception:
+                history = None
+            if history is not None and hasattr(history, "empty") and not history.empty:
+                try:
+                    price = float(history["Close"].iloc[-1])
+                except Exception:
+                    price = None
+
+        if price is None or (isinstance(price, float) and math.isnan(price)):
+            sys.exit(0)
+
+        print(price)
+        """
+    ).strip()
+
+    try:
+        result = run_command(
+            [str(python_executable), "-c", script, symbol],
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+    output = (result.stdout or "").strip()
+    if not output:
+        return None
+    try:
+        return float(output)
+    except ValueError:
+        return None
+
+
+def prompt_ticker_price(python_executable: Path) -> None:
+    ticker: str | None = None
+    while True:
+        if not ticker:
+            ticker = (
+                input(
+                    "Enter a ticker symbol to check before launching the Portfolio Tool UI "
+                    "(or press Enter to skip): "
+                )
+                .strip()
+            )
+            if not ticker:
+                return
+
+        price = fetch_price(python_executable, ticker)
+        if price is None:
+            print(f"Unable to retrieve a price for '{ticker}'.")
+        else:
+            formatted = f"${price:,.2f}"
+            print(f"The price is {formatted}.")
+
+        follow_up = input(
+            "Press Enter to continue launching the Portfolio Tool, or type another symbol "
+            "to check: "
+        ).strip()
+        if not follow_up:
+            return
+        ticker = follow_up
+
+
 def prepare_venv(reset: bool) -> tuple[Path, Path]:
     venv_path = venv_path_for_platform()
     if reset:
@@ -260,6 +361,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.cli:
             cli_args = shlex.split(args.cli)
         else:
+            if sys.stdin.isatty():
+                prompt_ticker_price(python_executable)
             cli_args = None
         launch_application(python_executable, cli_args)
         return 0
