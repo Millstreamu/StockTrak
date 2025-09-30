@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Iterable
 
-from rich.table import Table
+from portfolio_tool._rich_compat import Table
 
 from portfolio_tool.core.reports import LotRow, PositionRow
 
