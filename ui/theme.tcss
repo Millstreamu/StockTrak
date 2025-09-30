@@ -22,13 +22,13 @@ Screen {
 
 #sidebar-nav {
     height: auto;
-    gap: 1;
     margin-bottom: 1;
 }
 
 .sidebar-button {
     width: 100%;
     border: tall transparent;
+    margin-bottom: 1;
 }
 
 .sidebar-button.active {
@@ -40,7 +40,6 @@ Screen {
 
 #sidebar-shortcuts {
     color: #9aa5ce;
-    white-space: pre-line;
 }
 
 #main-content {
