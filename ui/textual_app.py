@@ -562,6 +562,20 @@ if TEXTUAL_AVAILABLE:
             except Exception:  # noqa: BLE001
                 log.exception("Header status refresh failed")
 
+            if self.current_symbol and self.symbol_detail:
+                try:
+                    detail = self.services.get_symbol_detail(self.current_symbol)
+                    self.symbol_detail.update_detail(detail)
+                except Exception:  # noqa: BLE001
+                    log.exception("Symbol detail refresh failed")
+
+            if self.current_lot and self.lot_detail:
+                try:
+                    detail = self.services.get_lot_detail(self.current_lot)
+                    self.lot_detail.update_detail(detail)
+                except Exception:  # noqa: BLE001
+                    log.exception("Lot detail refresh failed")
+
         @on(DataChanged)
         def _on_data_changed(self, _: DataChanged) -> None:
             self.refresh_all()
