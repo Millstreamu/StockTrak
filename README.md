@@ -29,6 +29,12 @@ All application data (configuration, SQLite database, and markdown exports) live
 3) Run `portfolio price-refresh CSL.AX` to seed a fresh price.
 4) Ensure `offline_mode=false` in `~/.portfolio_tool/config.toml`.
 
+### TUI Troubleshooting
+
+- Run with: `TEXTUAL_LOG=debug TEXTUAL_DEVTOOLS=1 portfolio ui`
+- Use keys 1–5 to switch between Dashboard, Positions, Lots, CGT Calendar, and Actionables.
+- After adding a trade, you should see “Trade saved; refreshing…” toast and refreshed rows.
+
 ## Features
 
 - Manual trade entry (buy or sell) with timezone-aware timestamps, fees, and optional notes.
