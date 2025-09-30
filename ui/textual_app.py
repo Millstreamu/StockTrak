@@ -591,6 +591,21 @@ if TEXTUAL_AVAILABLE:
 
 else:
 
+    class PortfolioApp:  # pragma: no cover - textual optional
+        """Placeholder PortfolioApp used when textual dependencies are unavailable."""
+
+        def __init__(self, *_: object, **__: object) -> None:
+            raise ModuleNotFoundError(
+                "The textual UI requires optional dependencies 'rich' and 'textual'. "
+                "Install the project with the 'ui' extras to enable this feature."
+            ) from _TEXTUAL_IMPORT_ERROR
+
+        def run(self) -> None:
+            raise ModuleNotFoundError(
+                "The textual UI requires optional dependencies 'rich' and 'textual'. "
+                "Install the project with the 'ui' extras to enable this feature."
+            ) from _TEXTUAL_IMPORT_ERROR
+
     def run(argv: Optional[list[str]] = None) -> None:  # pragma: no cover - defensive
         raise ModuleNotFoundError(
             "The textual UI requires optional dependencies 'rich' and 'textual'. "
