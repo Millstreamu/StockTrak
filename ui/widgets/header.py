@@ -38,5 +38,15 @@ class HeaderWidget(Widget):
         else:
             parts.append("Prices: —")
         if self._status.reason != "ok":
-            parts.append(f"[O] Offline [{self._status.reason}]")
+            parts.append(self._format_status_message())
         return Text(" | ".join(parts), style="bold white")
+
+    def _format_status_message(self) -> str:
+        reason = self._status.reason
+        if reason == "offline_mode":
+            return "[O] Offline [offline_mode]"
+        if reason == "stale":
+            return "[P] Prices stale"
+        if reason == "no_prices":
+            return "[P] No cached prices"
+        return f"[P] Prices {reason}"
