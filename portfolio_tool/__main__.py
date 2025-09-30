@@ -10,59 +10,7 @@ from typing import Optional
 import typer
 from zoneinfo import ZoneInfo
 
-try:  # pragma: no cover - exercised implicitly when Rich is available
-    from rich.console import Console  # type: ignore
-    from rich.table import Table  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - fallback for minimal environments
-    class Table:  # type: ignore[override]
-        """Minimal fallback table renderer when Rich is unavailable."""
-
-        def __init__(self, title: str | None = None):
-            self.title = title
-            self._columns: list[str] = []
-            self._rows: list[tuple[str, ...]] = []
-
-        def add_column(self, header: str, **_: object) -> None:
-            self._columns.append(str(header))
-
-        def add_row(self, *values: object, **_: object) -> None:
-            padded = tuple(str(value) for value in values)
-            self._rows.append(padded)
-
-        def _render(self) -> str:
-            if not self._columns:
-                return ""
-            all_rows = [self._columns, *[list(row) for row in self._rows]]
-            widths = [max(len(row[idx]) for row in all_rows) for idx in range(len(self._columns))]
-
-            def format_row(row: list[str]) -> str:
-                padded = [row[idx].ljust(widths[idx]) for idx in range(len(self._columns))]
-                return " | ".join(padded)
-
-            lines: list[str] = []
-            if self.title:
-                lines.append(self.title)
-            lines.append(format_row(self._columns))
-            lines.append("-+-".join("-" * width for width in widths))
-            for row in self._rows:
-                lines.append(format_row(list(row)))
-            return "\n".join(lines)
-
-    class Console:  # type: ignore[override]
-        """Simplified console that mirrors the subset of Rich used in tests."""
-
-        @staticmethod
-        def _strip_markup(text: str) -> str:
-            return text.replace("[", "").replace("]", "")
-
-        def print(self, *objects: object, sep: str = " ", end: str = "\n") -> None:
-            rendered: list[str] = []
-            for obj in objects:
-                if isinstance(obj, Table):
-                    rendered.append(obj._render())
-                else:
-                    rendered.append(self._strip_markup(str(obj)))
-            print(sep.join(rendered), end=end)
+from portfolio_tool._rich_compat import Console, Table
 
 from portfolio_tool.config import Config, load_config
 from portfolio_tool.core.cgt import cgt_threshold
