@@ -37,8 +37,9 @@ class HeaderWidget(Widget):
             parts.append(f"Prices: {timestamp}")
         else:
             parts.append("Prices: —")
-        if self._status.reason != "ok":
-            parts.append(self._format_status_message())
+        status_message = self._format_status_message()
+        if status_message:
+            parts.append(status_message)
         return Text(" | ".join(parts), style="bold white")
 
     def _format_status_message(self) -> str:
@@ -49,4 +50,6 @@ class HeaderWidget(Widget):
             return "[P] Prices stale"
         if reason == "no_prices":
             return "[P] No cached prices"
+        if reason == "ok":
+            return "[P] Prices current ✓"
         return f"[P] Prices {reason}"

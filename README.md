@@ -29,6 +29,7 @@ All application data (configuration, SQLite database, and markdown exports) live
 3) Run `portfolio price-refresh CSL.AX` to seed a fresh price.
 4) Ensure `offline_mode=false` in `~/.portfolio_tool/config.toml` if the header shows `[O] Offline`.
 5) If the header shows `[P] Prices stale` or `[P] No cached prices`, try refreshing prices or checking your network connection.
+6) When the header reads `[P] Prices current ✓` you have a fresh connection to the pricing APIs.
 
 ### TUI Troubleshooting
 
