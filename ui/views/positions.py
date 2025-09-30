@@ -91,6 +91,8 @@ class PositionsView(DataTable):
             self.post_message(PositionSelected(str(event.row_key)))
 
     def watch_cursor_row(self, value: int) -> None:  # pragma: no cover - Textual callback
-        row_key = self.get_row_key(value)
+        if not self.is_valid_row_index(value):
+            return
+        row_key = self.ordered_rows[value].key
         if row_key is not None:
             self.post_message(PositionSelected(str(row_key)))
