@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import datetime as dt
 import logging
 import os
@@ -7,10 +8,11 @@ from pathlib import Path
 from typing import Optional
 
 LOG_DIR = Path.home() / ".portfolio_tool" / "logs"
-UI_LOG_PATH = LOG_DIR / "ui.log"
+UI_LOG_PATH = LOG_DIR / "ui.txt"
 
 _UI_LOGGER = logging.getLogger("ui")
 _SESSION_LOG_PATH: Path | None = None
+_SHUTDOWN_REGISTERED = False
 
 
 def configure_logging() -> None:
@@ -38,7 +40,7 @@ def configure_logging() -> None:
 
     if _SESSION_LOG_PATH is None:
         timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
-        _SESSION_LOG_PATH = LOG_DIR / f"api-session-{timestamp}.log"
+        _SESSION_LOG_PATH = LOG_DIR / f"api-session-{timestamp}.txt"
         session_handler = logging.FileHandler(_SESSION_LOG_PATH, encoding="utf-8")
         session_handler.setLevel(logging.DEBUG)
         session_handler.setFormatter(formatter)
@@ -50,6 +52,11 @@ def configure_logging() -> None:
 
         os.environ["PORTFOLIO_TOOL_API_LOG"] = str(_SESSION_LOG_PATH)
         _UI_LOGGER.info("API session log initialised at %s", _SESSION_LOG_PATH)
+
+    global _SHUTDOWN_REGISTERED
+    if not _SHUTDOWN_REGISTERED:
+        atexit.register(logging.shutdown)
+        _SHUTDOWN_REGISTERED = True
 
 
 def get_api_log_path() -> Optional[Path]:
