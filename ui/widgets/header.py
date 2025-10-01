@@ -20,7 +20,17 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for minimal test envs
 
         def __str__(self) -> str:  # pragma: no cover - debugging helper
             return self._text
-from textual.widget import Widget
+try:
+    from textual.widget import Widget
+except ModuleNotFoundError:  # pragma: no cover - fallback for minimal test envs
+    class Widget:  # type: ignore[override]
+        """Fallback ``Widget`` used when ``textual`` is unavailable."""
+
+        def __init__(self, *_, **__) -> None:
+            """Accept arbitrary init args to mirror the real signature."""
+
+        def refresh(self) -> None:  # pragma: no cover - no-op for tests
+            """Provide ``refresh`` so widget logic can call it in tests."""
 
 from portfolio_tool.config import Config
 
