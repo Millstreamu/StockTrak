@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from portfolio_tool.config import Config
 from portfolio_tool.core.pricing import PriceService
 from portfolio_tool.data import models
+from portfolio_tool.logging_utils import get_api_log_path
 
 PriceReason = Literal["no_prices", "stale", "offline_mode", "ok"]
 
@@ -34,6 +35,7 @@ class PortfolioDiagnostics:
     offline_mode: bool
     price_provider: str
     price_ttl_minutes: int
+    api_log_path: Optional[Path]
 
 
 def collect_diagnostics(cfg: Config, session: Session) -> PortfolioDiagnostics:
@@ -70,6 +72,7 @@ def collect_diagnostics(cfg: Config, session: Session) -> PortfolioDiagnostics:
         offline_mode=cfg.offline_mode,
         price_provider=cfg.price_provider,
         price_ttl_minutes=cfg.price_ttl_minutes,
+        api_log_path=get_api_log_path(),
     )
 
 
