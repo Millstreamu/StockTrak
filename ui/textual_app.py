@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import logging
-import os
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -32,6 +31,7 @@ from portfolio_tool.data import models, repo
 from portfolio_tool.data.init_db import ensure_db
 from portfolio_tool.data.repo import Database
 from portfolio_tool.providers.fallback_provider import FallbackPriceProvider
+from portfolio_tool.logging_utils import configure_logging, get_api_log_path
 
 from .events import DataChanged
 
@@ -87,32 +87,7 @@ class DashboardSummary:
     actionable_count: int
 
 
-LOG_PATH = Path.home() / ".portfolio_tool" / "logs" / "ui.log"
 log = logging.getLogger("ui")
-
-
-def configure_logging() -> None:
-    """Ensure UI logs are routed to the configured destinations."""
-
-    if log.handlers:
-        return
-
-    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
-
-    file_handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    log.addHandler(file_handler)
-
-    if os.environ.get("TEXTUAL_LOG", "").lower() == "debug":
-        stream_handler = logging.StreamHandler()
-        stream_handler.setLevel(logging.DEBUG)
-        stream_handler.setFormatter(formatter)
-        log.addHandler(stream_handler)
-
-    log.setLevel(logging.DEBUG)
-    log.propagate = False
 
 class PortfolioServices:
     """Adapter layer for the TUI to interact with the domain services."""
@@ -348,6 +323,8 @@ if TEXTUAL_AVAILABLE:
             diag_table.add_row(
                 "Price TTL", f"{self.diagnostics.price_ttl_minutes} minutes"
             )
+            api_log = self.diagnostics.api_log_path
+            diag_table.add_row("API Log", str(api_log) if api_log else "—")
 
             shortcuts_table = Table(title="Shortcuts")
             shortcuts_table.add_column("Key")
@@ -437,6 +414,9 @@ if TEXTUAL_AVAILABLE:
                     self.sidebar.focus()
             self.show_dashboard()
             self.refresh_all()
+            api_log_path = get_api_log_path()
+            if api_log_path:
+                self.toast(f"API log: {api_log_path}")
 
         def on_key(self, event: events.Key) -> None:
             key = event.key

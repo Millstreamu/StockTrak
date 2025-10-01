@@ -30,6 +30,7 @@ from portfolio_tool.data import models, repo
 from portfolio_tool.data.init_db import ensure_db
 from portfolio_tool.data.repo import Database
 from portfolio_tool.providers.fallback_provider import FallbackPriceProvider
+from portfolio_tool.logging_utils import configure_logging, get_api_log_path
 from ui.textual_app import PortfolioApp, PortfolioServices, build_services
 from portfolio_tool.reports import md_renderer, tables
 from sqlalchemy import select
@@ -49,6 +50,7 @@ def main(
     ctx: typer.Context,
     config: Optional[Path] = typer.Option(None, "--config", help="Path to config.toml"),
 ):
+    configure_logging()
     cfg = load_config(config)
     engine = ensure_db()
     database = Database(engine)
@@ -307,6 +309,8 @@ def status(ctx: typer.Context):
     table.add_row("Offline Mode", "Yes" if diagnostics.offline_mode else "No")
     table.add_row("Price Provider", diagnostics.price_provider)
     table.add_row("Price TTL Minutes", str(diagnostics.price_ttl_minutes))
+    api_log_path = diagnostics.api_log_path or get_api_log_path()
+    table.add_row("API Log", str(api_log_path) if api_log_path else "—")
     console.print(table)
 
 
