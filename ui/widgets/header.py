@@ -4,7 +4,22 @@ import datetime as dt
 
 from typing import TYPE_CHECKING
 
-from rich.text import Text
+try:
+    from rich.text import Text
+except ModuleNotFoundError:  # pragma: no cover - fallback for minimal test envs
+    class Text:  # type: ignore[override]
+        """Fallback ``Text`` implementation used when ``rich`` is unavailable."""
+
+        def __init__(self, text: str, style: str | None = None) -> None:
+            self._text = text
+            self.style = style
+
+        @property
+        def plain(self) -> str:
+            return self._text
+
+        def __str__(self) -> str:  # pragma: no cover - debugging helper
+            return self._text
 from textual.widget import Widget
 
 from portfolio_tool.config import Config
