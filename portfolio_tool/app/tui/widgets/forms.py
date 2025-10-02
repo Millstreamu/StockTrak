@@ -4,10 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Mapping
 
-from textual.app import ComposeResult
-from textual.containers import Grid
-from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Select
+from .._textual import Button, ComposeResult, Grid, Input, Label, ModalScreen, Select
 from zoneinfo import ZoneInfo
 
 TRADE_TYPES = [

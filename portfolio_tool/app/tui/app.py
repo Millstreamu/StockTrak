@@ -6,23 +6,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-try:  # pragma: no cover - exercised indirectly in tests
-    from textual.app import App, ComposeResult
-    from textual.containers import Container
-    from textual.screen import ModalScreen
-    from textual.widgets import Footer, Header, Static, TabbedContent, TabPane
-except ModuleNotFoundError:  # pragma: no cover - used when textual is optional
-    from ._textual_stub import (  # type: ignore[assignment]
-        App,
-        ComposeResult,
-        Container,
-        Footer,
-        Header,
-        ModalScreen,
-        Static,
-        TabbedContent,
-        TabPane,
-    )
+from ._textual import (
+    HAVE_TEXTUAL,
+    App,
+    ComposeResult,
+    Container,
+    Footer,
+    Header,
+    ModalScreen,
+    Static,
+    TabbedContent,
+    TabPane,
+)
 
 from ...core.config import DEFAULT_CONFIG_PATH, ensure_config, load_config
 from ...core.pricing import PricingService
@@ -102,6 +97,19 @@ class PortfolioApp(App[None]):
         self.actionables_view = ActionablesView()
         self.prices_view = PricesView()
         self.config_view = ConfigView()
+
+        if not HAVE_TEXTUAL:
+            for view in (
+                self.dashboard_view,
+                self.trades_view,
+                self.positions_view,
+                self.lots_view,
+                self.cgt_view,
+                self.actionables_view,
+                self.prices_view,
+                self.config_view,
+            ):
+                view.app = self
 
     # ------------------------------------------------------------------
     def compose(self) -> ComposeResult:

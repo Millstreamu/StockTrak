@@ -3,10 +3,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
-from textual.reactive import reactive
-from textual.widgets import Input, Static
+from .._textual import ComposeResult, Horizontal, Input, Static, Vertical, reactive
 
 from ..widgets.tables import Loader, PagedTable
 
