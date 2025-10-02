@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Core domain services covering lot matching (FIFO/HIFO/Specific-ID), CGT disposal slicing, and brokerage allocation utilities.
 - Added data layer repositories (SQLite + JSON) with initial migrations.
 - Demo seeding and deterministic synthetic dataset scripts.
 
