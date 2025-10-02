@@ -12,6 +12,7 @@ from .lots import LotEngine, LotMatchingError, match_disposal
 from .cgt import CGTEngine, cgt_threshold
 from .brokerage import allocate_fees, BrokerageAllocationError
 from .services import PortfolioService
+from .reports import ReportingService, positions_report, set_reporting_engine
 
 __all__ = [
     "Actionable",
@@ -29,4 +30,7 @@ __all__ = [
     "allocate_fees",
     "BrokerageAllocationError",
     "PortfolioService",
+    "ReportingService",
+    "positions_report",
+    "set_reporting_engine",
 ]
