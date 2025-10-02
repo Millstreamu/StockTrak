@@ -183,6 +183,66 @@ class PortfolioService:
         return positions
 
     # ------------------------------------------------------------------
+    def rebuild_state(self) -> None:
+        """Recompute lot and disposal state from persisted transactions."""
+
+        tzinfo = ZoneInfo(self.timezone)
+        transactions = self.repo.list_transactions(order="asc")
+        if not transactions:
+            for lot in list(self.repo.list_lots()):
+                lot_id = lot.get("lot_id")
+                if lot_id is not None:
+                    self.repo.delete_lot(int(lot_id))
+            return
+
+        specific_maps: dict[int, dict[int, float]] = {}
+        for row in transactions:
+            if str(row.get("type")).upper() != "SELL":
+                continue
+            sell_id = int(row["id"])
+            disposals = self.repo.list_disposals(sell_txn_id=sell_id)
+            if not disposals:
+                continue
+            mapping: dict[int, float] = {}
+            for disp in disposals:
+                lot_id = disp.get("lot_id")
+                qty = disp.get("qty")
+                if lot_id is None or qty is None:
+                    continue
+                mapping[int(lot_id)] = float(qty)
+            if mapping:
+                specific_maps[sell_id] = mapping
+
+        for row in list(self.repo.list_lots()):
+            lot_id = row.get("lot_id")
+            if lot_id is not None:
+                self.repo.delete_lot(int(lot_id))
+        for row in transactions:
+            if str(row.get("type")).upper() == "SELL":
+                self.repo.delete_disposals_for_sell(int(row["id"]))
+
+        for row in transactions:
+            txn = Transaction(
+                id=int(row["id"]),
+                dt=datetime.fromisoformat(row["dt"]).astimezone(tzinfo),
+                type=row["type"],
+                symbol=row["symbol"],
+                qty=float(row["qty"]),
+                price=float(row["price"]),
+                fees=float(row.get("fees", 0.0)),
+                broker_ref=row.get("broker_ref"),
+                notes=row.get("notes"),
+                exchange=row.get("exchange"),
+            )
+            if txn.type in {"BUY", "DRP"}:
+                self._record_buy(txn)
+            elif txn.type == "SELL":
+                specific = specific_maps.get(txn.id or -1)
+                self._record_sell(txn, specific_lots=specific)
+            else:
+                raise ValueError(f"Unsupported transaction type: {txn.type}")
+
+    # ------------------------------------------------------------------
     def _lot_from_row(self, row: dict) -> Lot:
         tzinfo = ZoneInfo(self.timezone)
         acquired_at = datetime.fromisoformat(row["acquired_at"]).astimezone(tzinfo)

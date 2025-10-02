@@ -556,5 +556,15 @@ def prices_set(
         repo.close()
 
 
+@app.command()
+def tui() -> None:
+    """Launch the Textual TUI."""
+
+    ensure_config()
+    from .tui import PortfolioApp
+
+    PortfolioApp().run()
+
+
 if __name__ == "__main__":
     sys.exit(app())
