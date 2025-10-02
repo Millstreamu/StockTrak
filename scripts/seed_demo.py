@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from portfolio_tool.app.cli import ensure_config
+from portfolio_tool.core.config import ensure_config
 from portfolio_tool.data import JSONRepository, SQLiteRepository
 
 _TZ = ZoneInfo("Australia/Brisbane")

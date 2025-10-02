@@ -13,6 +13,7 @@ dependencies = [
     "typer[all]>=0.9",
     "tomli-w>=1.0.0",
     "tzdata>=2023.3",
+    "httpx>=0.25",
 ]
 
 [project.optional-dependencies]
