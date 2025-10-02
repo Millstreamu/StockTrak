@@ -76,6 +76,10 @@ class BaseRepository(ABC):
     def delete_lot(self, lot_id: int) -> None:
         """Delete a lot (used for data resets/testing)."""
 
+    @abstractmethod
+    def aggregate_open_lots(self) -> list[dict[str, Any]]:
+        """Return aggregate quantity and cost per symbol for open lots."""
+
     # --- disposals -----------------------------------------------------
     @abstractmethod
     def add_disposal(self, disposal: Mapping[str, Any]) -> int:

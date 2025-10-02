@@ -140,11 +140,25 @@ class PortfolioService:
         asof: datetime | None = None,
         prices: dict[str, PriceQuote | float] | None = None,
     ) -> list[Position]:
-        lots = [self._lot_from_row(row) for row in self.repo.list_lots(only_open=True)]
+        aggregates_rows = []
+        if hasattr(self.repo, "aggregate_open_lots"):
+            aggregates_rows = self.repo.aggregate_open_lots()
+
         aggregates: dict[str, tuple[float, float]] = {}
-        for lot in lots:
-            qty, cost = aggregates.get(lot.symbol, (0.0, 0.0))
-            aggregates[lot.symbol] = (qty + lot.qty_remaining, cost + lot.cost_base_total)
+        if aggregates_rows:
+            for row in aggregates_rows:
+                symbol = row["symbol"]
+                qty = float(row.get("total_qty", 0.0) or 0.0)
+                cost = float(row.get("total_cost", 0.0) or 0.0)
+                aggregates[symbol] = (qty, cost)
+        else:
+            lots = [self._lot_from_row(row) for row in self.repo.list_lots(only_open=True)]
+            for lot in lots:
+                qty, cost = aggregates.get(lot.symbol, (0.0, 0.0))
+                aggregates[lot.symbol] = (
+                    qty + lot.qty_remaining,
+                    cost + lot.cost_base_total,
+                )
 
         price_lookup: dict[str, float | None] = {}
         if prices:

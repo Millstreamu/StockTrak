@@ -38,7 +38,10 @@ class PricesView(TableView):
             return []
         repo = services.repo
         symbols = {row["symbol"] for row in repo.list_transactions()}
-        symbols.update({row["symbol"] for row in repo.list_lots(only_open=True)})
+        if hasattr(repo, "aggregate_open_lots"):
+            symbols.update(row["symbol"] for row in repo.aggregate_open_lots())
+        else:
+            symbols.update({row["symbol"] for row in repo.list_lots(only_open=True)})
         return sorted(symbols)
 
     def _compute_rows(self) -> None:

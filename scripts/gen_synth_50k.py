@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from random import Random
 from zoneinfo import ZoneInfo
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from portfolio_tool.data import JSONRepository, SQLiteRepository
 
@@ -49,8 +54,39 @@ def _synth_transactions(count: int, seed: int = 2024):
 
 
 def _seed_repo(repo, txns) -> None:
-    for txn in txns:
-        repo.add_transaction(txn)
+    if isinstance(repo, SQLiteRepository):
+        columns = (
+            "dt",
+            "type",
+            "symbol",
+            "qty",
+            "price",
+            "fees",
+            "broker_ref",
+            "notes",
+            "exchange",
+        )
+        placeholders = ", ".join(["?"] * len(columns))
+        repo._conn.executemany(  # type: ignore[attr-defined]
+            f"""
+            INSERT INTO transactions ({', '.join(columns)})
+            VALUES ({placeholders});
+            """,
+            [tuple(txn.get(col) for col in columns) for txn in txns],
+        )
+        repo._conn.commit()  # type: ignore[attr-defined]
+    elif isinstance(repo, JSONRepository):
+        repo._state["transactions"] = []  # type: ignore[attr-defined]
+        next_id = 1
+        for txn in txns:
+            record = {"id": next_id, **txn}
+            repo._state["transactions"].append(record)  # type: ignore[attr-defined]
+            next_id += 1
+        repo._state["meta"]["next_ids"]["transactions"] = next_id  # type: ignore[attr-defined]
+        repo._persist()  # type: ignore[attr-defined]
+    else:  # pragma: no cover - fallback for future backends
+        for txn in txns:
+            repo.add_transaction(txn)
     repo.close()
 
 
