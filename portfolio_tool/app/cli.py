@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 from ..core.config import ensure_config, load_config
 from ..core.pricing import PricingService
 from ..core.reports import ReportingService, set_reporting_engine
+from ..core.rules import ActionableService
 from ..core.services import PortfolioService
 from ..data import JSONRepository, SQLiteRepository
 from ..plugins.pricing import get_provider
@@ -141,6 +142,23 @@ def _symbols_with_open_lots(repo) -> list[str]:
     return sorted({row["symbol"] for row in rows})
 
 
+def _actionable_rows(items: Sequence) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for item in items:
+        rows.append(
+            {
+                "id": getattr(item, "id", None),
+                "type": getattr(item, "type", None),
+                "symbol": getattr(item, "symbol", None),
+                "message": getattr(item, "message", None),
+                "status": getattr(item, "status", None),
+                "snoozed_until": getattr(item, "snoozed_until", None),
+                "updated_at": getattr(item, "updated_at", None),
+            }
+        )
+    return rows
+
+
 POSITIONS_FIELDS = [
     "report_asof",
     "base_currency",
@@ -212,6 +230,26 @@ CGT_COLUMNS = [
     ("days_until", "Days"),
     ("eligible_for_discount", "Eligible"),
     ("qty_remaining", "Qty"),
+]
+
+ACTIONABLE_FIELDS = [
+    "id",
+    "type",
+    "symbol",
+    "message",
+    "status",
+    "snoozed_until",
+    "updated_at",
+]
+
+ACTIONABLE_COLUMNS = [
+    ("id", "ID"),
+    ("type", "Type"),
+    ("symbol", "Symbol"),
+    ("message", "Message"),
+    ("status", "Status"),
+    ("snoozed_until", "Snoozed"),
+    ("updated_at", "Updated"),
 ]
 
 
@@ -345,6 +383,68 @@ def cgt_calendar(
         else:
             print("[yellow]No CGT events within window[/yellow]")
         _handle_export(export, rows, fieldnames=CGT_FIELDS)
+    finally:
+        repo.close()
+
+
+@app.command()
+def actionables(
+    complete: Optional[int] = typer.Option(
+        None,
+        "--complete",
+        metavar="ID",
+        help="Mark an actionable as completed.",
+    ),
+    snooze: Optional[int] = typer.Option(
+        None,
+        "--snooze",
+        metavar="ID",
+        help="Snooze an actionable for a number of days.",
+    ),
+    days: Optional[int] = typer.Option(
+        None,
+        "--days",
+        help="Days to snooze when using --snooze.",
+    ),
+) -> None:
+    if complete is not None and snooze is not None:
+        raise typer.BadParameter("Use either --complete or --snooze, not both")
+    if snooze is not None and (days is None or days <= 0):
+        raise typer.BadParameter("--days must be greater than zero when snoozing")
+    config = load_config()
+    repo = _open_repository(config)
+    tz_name = config.get("timezone", "Australia/Brisbane")
+    try:
+        portfolio = _portfolio_service(repo, config)
+        reporting = _reporting_service(repo, config, portfolio)
+        pricing = _build_pricing_service(repo, config)
+        service = ActionableService(
+            repo,
+            portfolio_service=portfolio,
+            reporting_service=reporting,
+            pricing_service=pricing,
+            timezone=tz_name,
+            target_weights=config.get("target_weights", {}),
+            rule_thresholds=config.get("rule_thresholds", {}),
+        )
+        items = service.evaluate_rules(include_snoozed=True)
+        message: str | None = None
+        if complete is not None:
+            service.complete(complete)
+            message = f"Marked actionable {complete} complete"
+            items = service.list_actionables(include_snoozed=True)
+        elif snooze is not None and days is not None:
+            service.snooze(snooze, days)
+            message = f"Snoozed actionable {snooze} for {days} days"
+            items = service.list_actionables(include_snoozed=True)
+        if message:
+            print(f"[green]{message}[/green]")
+        active_items = [item for item in items if getattr(item, "status", "").upper() != "DONE"]
+        rows = _actionable_rows(active_items)
+        if rows:
+            _render_table(rows, ACTIONABLE_COLUMNS)
+        else:
+            print("[yellow]No actionables[/yellow]")
     finally:
         repo.close()
 

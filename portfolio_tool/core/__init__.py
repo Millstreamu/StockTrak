@@ -13,6 +13,7 @@ from .cgt import CGTEngine, cgt_threshold
 from .brokerage import allocate_fees, BrokerageAllocationError
 from .services import PortfolioService
 from .reports import ReportingService, positions_report, set_reporting_engine
+from .rules import ActionableService
 
 __all__ = [
     "Actionable",
@@ -33,4 +34,5 @@ __all__ = [
     "ReportingService",
     "positions_report",
     "set_reporting_engine",
+    "ActionableService",
 ]

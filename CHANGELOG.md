@@ -6,6 +6,7 @@
 - Demo seeding and deterministic synthetic dataset scripts.
 - Pricing subsystem with provider plugins, CLI commands for `portfolio prices`, and configuration helpers.
 - Reporting engine with CLI commands for positions, lots, and CGT calendar plus CSV/Markdown exporters and golden fixtures.
+- Actionables rules engine with starter rule pack, persisted lifecycle (open/done/snooze), and CLI management commands.
 
 ## 0.0.1 - Initial scaffolding
 - Established package structure and CLI stub.
