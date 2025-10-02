@@ -2,11 +2,12 @@
 
 This project aims to build an auditable, deterministic portfolio management tool focused on Australian tax rules.
 
-## Stage 0 Status
+## Stage 1 Status
 
-- Python package scaffold with Typer-based CLI stub.
-- Default configuration (`config.toml`) generated automatically on first run.
-- Demo seeding script placeholder.
+- Persistence layer implemented with interchangeable SQLite and JSON repositories.
+- Automatic schema migrations (001_init) provision the required tables and indexes.
+- Demo seeding script now provisions both backends with example trades and a cached price.
+- Deterministic synthetic dataset generator (`scripts/gen_synth_50k.py`) for performance testing.
 
 Run the CLI help to confirm installation:
 
@@ -18,3 +19,5 @@ portfolio --help
 
 - Create a virtual environment: `make venv`
 - Run tests: `make test`
+- Generate demo data: `python scripts/seed_demo.py`
+- Build synthetic datasets: `python scripts/gen_synth_50k.py`
