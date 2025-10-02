@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from textual.app import ComposeResult
-from textual.widgets import Static
+from .._textual import ComposeResult, Static
 from zoneinfo import ZoneInfo
 
 from .base import PortfolioView

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Callable, Sequence
 
-from textual.widgets import DataTable
+from .._textual import DataTable
 
 Loader = Callable[[int, int, str], tuple[Sequence[dict[str, object]], int]]
 

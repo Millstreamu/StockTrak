@@ -1,7 +1,7 @@
 """Toast helpers for the Textual application."""
 from __future__ import annotations
 
-from textual.app import App
+from .._textual import App
 
 
 def show_toast(app: App, message: str, *, severity: str = "information") -> None:
