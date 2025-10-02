@@ -17,6 +17,12 @@ Run the CLI help to confirm installation:
 portfolio --help
 ```
 
+You can also launch the tool with a single command from the project root:
+
+```bash
+python main.py
+```
+
 ## Development
 
 - Create a virtual environment: `make venv`
