@@ -2,12 +2,12 @@
 
 This project aims to build an auditable, deterministic portfolio management tool focused on Australian tax rules.
 
-## Stage 4 Status
+## Stage 5 Status
 
-- Reporting engine delivers position snapshots, lot ledgers, and CGT calendar views sourced from persisted trades.
-- CSV/Markdown exporters provide deterministic audit trails including price provenance and report timestamps.
-- CLI commands now include `portfolio positions`, `portfolio lots`, `portfolio cgt-calendar`, and `portfolio report daily` with optional price refresh/export flags.
-- Existing pricing subsystem, configuration helpers, and data tooling remain available for smoke testing and development.
+- Actionables engine evaluates CGT windows, portfolio weights, concentrations, unrealised losses, stale prices, and trailing-stop coverage.
+- CLI now supports `portfolio actionables` for listing, snoozing, and completing persisted follow-up items.
+- Reporting exports (positions, lots, CGT calendar) continue to provide deterministic CSV/Markdown outputs with provenance fields.
+- Pricing subsystem, configuration helpers, and data tooling remain available for smoke testing and development.
 
 Run the CLI help to confirm installation:
 
