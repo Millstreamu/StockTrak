@@ -29,4 +29,7 @@ portfolio = "portfolio_tool.app.cli:app"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 addopts = "-q"
+markers = [
+    "performance: marks tests that measure performance (deselect with '-m \"not performance\"')",
+]
 

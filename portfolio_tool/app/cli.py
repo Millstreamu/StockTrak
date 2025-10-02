@@ -138,6 +138,9 @@ def _handle_export(
 
 
 def _symbols_with_open_lots(repo) -> list[str]:
+    if hasattr(repo, "aggregate_open_lots"):
+        aggregates = repo.aggregate_open_lots()
+        return [row["symbol"] for row in aggregates]
     rows = repo.list_lots(only_open=True)
     return sorted({row["symbol"] for row in rows})
 

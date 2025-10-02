@@ -123,6 +123,23 @@ def test_lot_and_disposal_roundtrip(repo):
     assert repo.list_disposals(lot_id=lot_id) == []
 
 
+def test_aggregate_open_lots(repo):
+    lot_a = _sample_lot("CSL")
+    lot_a.update({"qty_remaining": 10.0, "cost_base_total": 1000.0})
+    lot_b = _sample_lot("CSL")
+    lot_b.update({"qty_remaining": 5.0, "cost_base_total": 600.0})
+    lot_c = _sample_lot("BHP")
+    lot_c.update({"qty_remaining": 0.0, "cost_base_total": 0.0})
+
+    repo.add_lot(lot_a)
+    repo.add_lot(lot_b)
+    closed_id = repo.add_lot(lot_c)
+    repo.update_lot(closed_id, {"qty_remaining": 0.0})
+
+    aggregates = repo.aggregate_open_lots()
+    assert aggregates == [{"symbol": "CSL", "total_qty": 15.0, "total_cost": 1600.0}]
+
+
 def test_price_cache_roundtrip(repo):
     record = _sample_price()
     repo.upsert_price(record)

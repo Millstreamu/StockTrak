@@ -2,12 +2,14 @@
 
 This project aims to build an auditable, deterministic portfolio management tool focused on Australian tax rules.
 
-## Stage 6 Status
+## Stage 7 Status
 
-- Textual TUI (`portfolio tui`) featuring dashboard, trades, positions, lots, CGT calendar, actionables, prices, and config tabs with paged tables.
+- Aggregated lot summaries accelerate holdings snapshots to comfortably handle 50k synthetic trades within the <5s budget.
+- Performance pytest marker (`-m performance`) seeds 50k open lots and asserts snapshot latency locally while remaining skipped on CI.
+- Textual TUI (`portfolio tui`) retains dashboard, trades, positions, lots, CGT calendar, actionables, prices, and config tabs with paged tables.
 - Keyboard shortcuts: `F1` help overlay, `Q` quit, `R` refresh, `/` search focus, `A` add, `E` edit, `D` delete, `S` save/export/manual actions.
 - Trades tab supports add/edit/delete with validated forms and automatic portfolio rebuilds; price tab shows provider status, last refresh, and manual overrides.
-- Actionables, pricing, and reporting services remain available for CLI flows alongside the new TUI.
+- Actionables, pricing, and reporting services remain available for CLI flows alongside the TUI.
 
 Run the CLI help to confirm installation:
 
@@ -21,6 +23,7 @@ portfolio --help
 - Run tests: `make test`
 - Generate demo data: `python scripts/seed_demo.py`
 - Build synthetic datasets: `python scripts/gen_synth_50k.py`
+- Run performance sweep locally: `pytest -q -m performance`
 - Manage price cache:
   - Show cached quotes: `portfolio prices show`
   - Refresh via provider: `portfolio prices refresh CSL IOZ`

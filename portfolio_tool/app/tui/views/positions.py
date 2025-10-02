@@ -40,7 +40,11 @@ class PositionsView(TableView):
         repo = services.repo
         reporting = services.reporting
         pricing = services.pricing
-        symbols = sorted({row["symbol"] for row in repo.list_lots(only_open=True)})
+        if hasattr(repo, "aggregate_open_lots"):
+            aggregates = repo.aggregate_open_lots()
+            symbols = [row["symbol"] for row in aggregates]
+        else:
+            symbols = sorted({row["symbol"] for row in repo.list_lots(only_open=True)})
         quotes = pricing.get_cached(symbols)
         snapshot = reporting.positions_snapshot(datetime.now(tz=tz), quotes)
         self._rows = snapshot

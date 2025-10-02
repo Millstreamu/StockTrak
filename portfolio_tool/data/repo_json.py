@@ -144,6 +144,21 @@ class JSONRepository(BaseRepository):
                 self._persist()
                 return
 
+    def aggregate_open_lots(self) -> list[dict[str, Any]]:
+        aggregates: dict[str, tuple[float, float]] = {}
+        for row in self._state["lots"]:
+            qty = float(row.get("qty_remaining", 0.0) or 0.0)
+            if qty <= 0:
+                continue
+            symbol = row["symbol"]
+            cost = float(row.get("cost_base_total", 0.0) or 0.0)
+            total_qty, total_cost = aggregates.get(symbol, (0.0, 0.0))
+            aggregates[symbol] = (total_qty + qty, total_cost + cost)
+        return [
+            {"symbol": symbol, "total_qty": qty, "total_cost": cost}
+            for symbol, (qty, cost) in sorted(aggregates.items())
+        ]
+
     # --- disposals -----------------------------------------------------
     def add_disposal(self, disposal: Mapping[str, Any]) -> int:
         disp_id = self._next_id("disposals")

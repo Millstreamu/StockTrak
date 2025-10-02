@@ -144,6 +144,29 @@ class SQLiteRepository(BaseRepository):
     def delete_lot(self, lot_id: int) -> None:
         self._execute("DELETE FROM lots WHERE lot_id = ?;", (lot_id,))
 
+    def aggregate_open_lots(self) -> list[dict[str, Any]]:
+        rows = self._fetchall(
+            """
+            SELECT symbol,
+                   SUM(qty_remaining) AS total_qty,
+                   SUM(cost_base_total) AS total_cost
+            FROM lots
+            WHERE qty_remaining > 0
+            GROUP BY symbol
+            ORDER BY symbol ASC;
+            """
+        )
+        aggregates: list[dict[str, Any]] = []
+        for row in rows:
+            aggregates.append(
+                {
+                    "symbol": row["symbol"],
+                    "total_qty": float(row.get("total_qty") or 0.0),
+                    "total_cost": float(row.get("total_cost") or 0.0),
+                }
+            )
+        return aggregates
+
     # --- disposals -----------------------------------------------------
     def add_disposal(self, disposal: Mapping[str, Any]) -> int:
         columns = ", ".join(disposal.keys())

@@ -8,6 +8,7 @@
 - Reporting engine with CLI commands for positions, lots, and CGT calendar plus CSV/Markdown exporters and golden fixtures.
 - Actionables rules engine with starter rule pack, persisted lifecycle (open/done/snooze), and CLI management commands.
 - Textual TUI with dashboard, trades, positions, lots, CGT, actionables, prices, and config tabs plus modal forms and paged tables.
+- Aggregated open lot summaries and performance test markers ensuring holdings snapshots stay under the 5s budget on 50k trades.
 
 ## 0.0.1 - Initial scaffolding
 - Established package structure and CLI stub.
