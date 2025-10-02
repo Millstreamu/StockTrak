@@ -2,12 +2,12 @@
 
 This project aims to build an auditable, deterministic portfolio management tool focused on Australian tax rules.
 
-## Stage 5 Status
+## Stage 6 Status
 
-- Actionables engine evaluates CGT windows, portfolio weights, concentrations, unrealised losses, stale prices, and trailing-stop coverage.
-- CLI now supports `portfolio actionables` for listing, snoozing, and completing persisted follow-up items.
-- Reporting exports (positions, lots, CGT calendar) continue to provide deterministic CSV/Markdown outputs with provenance fields.
-- Pricing subsystem, configuration helpers, and data tooling remain available for smoke testing and development.
+- Textual TUI (`portfolio tui`) featuring dashboard, trades, positions, lots, CGT calendar, actionables, prices, and config tabs with paged tables.
+- Keyboard shortcuts: `F1` help overlay, `Q` quit, `R` refresh, `/` search focus, `A` add, `E` edit, `D` delete, `S` save/export/manual actions.
+- Trades tab supports add/edit/delete with validated forms and automatic portfolio rebuilds; price tab shows provider status, last refresh, and manual overrides.
+- Actionables, pricing, and reporting services remain available for CLI flows alongside the new TUI.
 
 Run the CLI help to confirm installation:
 
@@ -29,3 +29,4 @@ portfolio --help
   - Positions: `portfolio positions --refresh-prices --export csv reports/positions.csv`
   - Lots ledger (single symbol): `portfolio lots CSL --export md reports/lots.md`
   - CGT calendar (60-day window): `portfolio cgt-calendar --window 60`
+- Launch the Textual TUI: `portfolio tui` (or `./scripts/run_tui.sh`)
