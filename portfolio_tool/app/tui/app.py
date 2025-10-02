@@ -6,10 +6,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from textual.app import App, ComposeResult
-from textual.containers import Container
-from textual.screen import ModalScreen
-from textual.widgets import Footer, Header, Static, TabbedContent, TabPane
+try:  # pragma: no cover - exercised indirectly in tests
+    from textual.app import App, ComposeResult
+    from textual.containers import Container
+    from textual.screen import ModalScreen
+    from textual.widgets import Footer, Header, Static, TabbedContent, TabPane
+except ModuleNotFoundError:  # pragma: no cover - used when textual is optional
+    from ._textual_stub import (  # type: ignore[assignment]
+        App,
+        ComposeResult,
+        Container,
+        Footer,
+        Header,
+        ModalScreen,
+        Static,
+        TabbedContent,
+        TabPane,
+    )
 
 from ...core.config import DEFAULT_CONFIG_PATH, ensure_config, load_config
 from ...core.pricing import PricingService
